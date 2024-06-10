@@ -1,12 +1,9 @@
 module [
     compareSemvers,
     comparePreReleases,
-    compareBuilds,
 ]
 
-import Semver exposing [Semver]
-
-Ordering : [LT, GT, EQ]
+import Types exposing [Semver, Ordering]
 
 compareSemvers : Semver, Semver -> Ordering
 compareSemvers = \left, right ->
@@ -27,19 +24,15 @@ comparePreReleases = \left, right ->
         # Prerelease compares less than the real release.
         LT
     else
-        compareBuilds left right
+        orderings =
+            List.map2 left right Pair
+            |> List.keepOks \Pair leftSegment rightSegment ->
+                compareIdentifiers leftSegment rightSegment
+                |> onlyAllowDifferentOrdering
 
-compareBuilds : List Str, List Str -> Ordering
-compareBuilds = \left, right ->
-    orderings =
-        List.map2 left right Pair
-        |> List.keepOks \Pair leftSegment rightSegment ->
-            compareIdentifiers leftSegment rightSegment
-            |> onlyAllowDifferentOrdering
-
-    when List.first orderings is
-        Ok ordering -> ordering
-        Err ListWasEmpty -> Num.compare (List.len left) (List.len right)
+        when List.first orderings is
+            Ok ordering -> ordering
+            Err ListWasEmpty -> Num.compare (List.len left) (List.len right)
 
 compareIdentifiers : Str, Str -> Ordering
 compareIdentifiers = \left, right ->
@@ -113,6 +106,9 @@ expect compareSemvers { baseTestSemver & preRelease: ["alpha"] } baseTestSemver 
 expect compareSemvers baseTestSemver { baseTestSemver & preRelease: ["alpha"], major: 0 } == GT
 expect compareSemvers baseTestSemver { baseTestSemver & preRelease: ["alpha"], minor: 1 } == GT
 expect compareSemvers baseTestSemver { baseTestSemver & preRelease: ["alpha"], patch: 2 } == GT
+
+# build metadata isn't considered for comparison
+expect compareSemvers baseTestSemver { baseTestSemver & build: ["alpha"] } == EQ
 
 expect comparePreReleases [] [] == EQ
 

@@ -1,6 +1,7 @@
 package [
-    Compare,
-    Parse,
+    Error,
+    Types,
     Semver,
     VersionReq,
+    Comparator,
 ] {}

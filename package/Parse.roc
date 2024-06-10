@@ -5,57 +5,23 @@ module [
     comparatorLazy,
     versionReq,
     versionReqLazy,
-    InvalidNumberError,
-    InvalidSemverError,
-    InvalidIdentifierError,
-    InvalidVersionReqError,
-    InvalidComparatorError,
 ]
 
 import AsciiCode
-import Semver exposing [Semver]
-import VersionReq exposing [VersionReq, Comparator, ComparisonOperator]
+import Types exposing [
+    Semver,
+    VersionReq,
+    Comparator,
+]
+import Error exposing [
+    InvalidSemverError,
+    InvalidVersionReqError,
+    InvalidComparatorError,
+    InvalidNumberError,
+    InvalidIdentifierError,
+]
 
 maxComparatorCount = 32
-
-InvalidNumberError : [
-    Empty,
-    InvalidNumber,
-    CannotStartWithZero,
-]
-
-InvalidIdentifierError : [
-    EmptySegment,
-    InvalidIdentifier,
-]
-
-InvalidSemverError : [
-    EmptySemver,
-    InvalidMajorVersion InvalidNumberError,
-    NoPeriodAfterMajorVersion,
-    InvalidMinorVersion InvalidNumberError,
-    NoPeriodAfterMinorVersion,
-    InvalidPatchVersion InvalidNumberError,
-    InvalidPreRelease InvalidIdentifierError,
-    InvalidBuild InvalidIdentifierError,
-    UnexpectedSuffix Str,
-]
-
-InvalidVersionReqError : [
-    InvalidComparator { index : U64, error : InvalidComparatorError },
-    TooManyComparators,
-    UnexpectedSuffix Str,
-]
-
-InvalidComparatorError : [
-    InvalidMajorVersion InvalidNumberError,
-    InvalidMinorConstraint InvalidNumberError,
-    InvalidPatchConstraint InvalidNumberError,
-    PatchSpecifiedAfterMinorWildcard,
-    InvalidPreReleaseConstraint InvalidIdentifierError,
-    InvalidBuildConstraint InvalidIdentifierError,
-    UnexpectedSuffix Str,
-]
 
 semverLazy : Str -> Result { version : Semver, rest : Str } InvalidSemverError
 semverLazy = \s ->
