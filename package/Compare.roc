@@ -1,6 +1,7 @@
 module [
     compareSemvers,
     comparePreReleases,
+    compareIfEqual,
 ]
 
 import Types exposing [Semver, Ordering]

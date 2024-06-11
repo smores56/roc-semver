@@ -9,14 +9,14 @@ by David Tolnay.
 ## Example
 
 ```roc
-import semver.Parse
+import semver.Semver
 import semver.VersionReq
 
-version = Parse.semver "1.2.3-alpha.beta+build--"
-verReq = Parse.versionReq ">=1.2, <2"
+versionRes = Semver.parse "1.2.3-alpha.beta+build--"
+versionReqRes = VersionReq.parse ">=1.2.3-alpha.beta, <2"
 
 expect
-    version == Ok {
+    versionRes == Ok {
         major: 1,
         minor: 2,
         patch: 3,
@@ -25,12 +25,9 @@ expect
     }
 
 expect
-    when (version, verReq) is
-        (Ok v, Ok vr) -> VersionReq.matches vr r
+    when (versionRes, versionReqRes) is
+        (Ok version, Ok versionReq) ->
+            versionReq |> VersionReq.matches version
+
         _other -> Bool.false
 ```
-
-## Roadmap
-
-This library is basically implemented, I just plan to finish up testing
-and documentation and then leave it until someone needs a new feature.

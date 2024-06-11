@@ -12,6 +12,7 @@ import Types exposing [
     Semver,
     VersionReq,
     Comparator,
+    ComparatorOperator,
 ]
 import Error exposing [
     InvalidSemverError,
@@ -23,7 +24,7 @@ import Error exposing [
 
 maxComparatorCount = 32
 
-semverLazy : Str -> Result { version : Semver, rest : Str } InvalidSemverError
+semverLazy : Str -> Result (Semver, Str) InvalidSemverError
 semverLazy = \s ->
     {} <- assertSemverNotEmpty s
         |> Result.try
@@ -55,22 +56,22 @@ semverLazy = \s ->
         |> Result.mapErr InvalidBuild
         |> Result.try
 
-    Ok {
-        version: {
+    Ok (
+        {
             major,
             minor,
             patch,
             build,
             preRelease,
         },
-        rest: afterBuild
+        afterBuild
         |> Str.fromUtf8
         |> Result.withDefault "",
-    }
+    )
 
 semver : Str -> Result Semver InvalidSemverError
 semver = \s ->
-    { version, rest } <- semverLazy s
+    (version, rest) <- semverLazy s
         |> Result.try
 
     if Str.isEmpty rest then
@@ -242,171 +243,121 @@ comparator = \s ->
 
 parseComparator : List U8 -> Result (Comparator, List U8) InvalidComparatorError
 parseComparator = \chars ->
-    (maybeOperator, afterOperator) = parseComparisonOperator chars
-    afterSpaces = dropCharsWhile afterOperator isSpace
+    when parseWildcard chars is
+        Ok afterWildcard ->
+            Ok (Wildcard Full, afterWildcard)
 
-    (major, afterMajor) <- parseNumericIdentifier afterSpaces
-        |> Result.mapErr InvalidMajorVersion
-        |> Result.try
+        Err NotWildcard ->
+            (operator, afterOperator) = parseComparatorOperator chars
+            afterSpaces = dropCharsWhile afterOperator isSpace
 
-    { minor, afterMinor, minorHasWildcard } <- parseComparatorMinorConstraint afterMajor
-        |> Result.try
-    { patch, afterPatch, patchHasWildcard } <- parseComparatorPatchConstraint { chars: afterMinor, minorHasWildcard }
-        |> Result.try
+            (major, afterMajor) <- parseNumericIdentifier afterSpaces
+                |> Result.mapErr InvalidMajorVersion
+                |> Result.try
+            (minor, afterMinor) <- parseComparatorMinorConstraint afterMajor
+                |> Result.try
 
-    # TODO: move to helper function
-    preReleaseResult =
-        if Result.isOk patch then
-            when afterPatch is
-                [first, .. as rest] if first == AsciiCode.hyphen ->
-                    parsePreRelease rest
-                    |> Result.mapErr InvalidPreReleaseConstraint
+            when minor is
+                NotSpecified -> Ok (Relation { operator, version: Major major }, afterMinor)
+                Wildcard -> Ok (Wildcard (Major major), afterMinor)
+                Specific specificMinor ->
+                    (patch, afterPatch) <- parseComparatorPatchConstraint afterMinor
+                        |> Result.try
 
-                _otherwise -> Ok ([], afterPatch)
-        else
-            Ok ([], afterPatch)
+                    when patch is
+                        NotSpecified -> Ok (Relation { operator, version: MajorMinor major specificMinor }, afterPatch)
+                        Wildcard -> Ok (Wildcard (MajorMinor major specificMinor), afterPatch)
+                        Specific specificPatch ->
+                            (preRelease, afterPreRelease) <- parseComparatorPreRelease afterPatch
+                                |> Result.try
+                            (_build, afterBuild) <- parseComparatorBuild afterPreRelease
+                                |> Result.try
 
-    (preRelease, afterPreRelease) <- preReleaseResult
-        |> Result.try
+                            Ok (
+                                Relation {
+                                    operator,
+                                    version: Full {
+                                        major,
+                                        minor: specificMinor,
+                                        patch: specificPatch,
+                                        preRelease,
+                                    },
+                                },
+                                afterBuild,
+                            )
 
-    # TODO: move to helper function
-    buildResult =
-        if Result.isOk patch then
-            when afterPreRelease is
-                [first, .. as rest] if first == AsciiCode.plus ->
-                    parseBuild rest
-                    |> Result.mapErr InvalidBuildConstraint
+parseComparatorOperator : List U8 -> (ComparatorOperator, List U8)
+parseComparatorOperator = \chars ->
+    when chars is
+        [first, .. as rest] if first == AsciiCode.equals ->
+            (Exact, rest)
 
-                _otherwise -> Ok ([], afterPreRelease)
-        else
-            Ok ([], afterPreRelease)
+        [first, second, .. as rest] if first == AsciiCode.lessThan && second == AsciiCode.equals ->
+            (LessThanOrEqualTo, rest)
 
-    (_build, afterBuild) <- buildResult
-        |> Result.try
+        [first, .. as rest] if first == AsciiCode.lessThan ->
+            (LessThan, rest)
 
-    operator =
-        when maybeOperator is
-            Ok op -> op
-            Err NoOperator ->
-                if minorHasWildcard || patchHasWildcard then
-                    Wildcard
-                else
-                    Compatible
+        [first, second, .. as rest] if first == AsciiCode.greaterThan && second == AsciiCode.equals ->
+            (GreaterThanOrEqualTo, rest)
 
-    Ok (
-        {
-            operator,
-            major,
-            minor,
-            patch,
-            preRelease,
-        },
-        afterBuild,
-    )
+        [first, .. as rest] if first == AsciiCode.greaterThan ->
+            (GreaterThan, rest)
 
-parseComparatorMinorConstraint : List U8
-    -> Result
-        {
-            minor : Result U64 [NotSpecified],
-            afterMinor : List U8,
-            minorHasWildcard : Bool,
-        }
-        InvalidComparatorError
+        [first, .. as rest] if first == AsciiCode.tilde ->
+            (PatchUpdates, rest)
+
+        [first, .. as rest] if first == AsciiCode.caret ->
+            (Compatible, rest)
+
+        _otherwise ->
+            (Exact, chars)
+
+parseComparatorMinorConstraint : List U8 -> Result ([Specific U64, Wildcard, NotSpecified], List U8) InvalidComparatorError
 parseComparatorMinorConstraint = \chars ->
     when parseByte chars AsciiCode.period is
-        Err ByteNotFound ->
-            Ok {
-                minor: Err NotSpecified,
-                afterMinor: chars,
-                minorHasWildcard: Bool.false,
-            }
-
+        Err ByteNotFound -> Ok (NotSpecified, chars)
         Ok afterMajorPeriod ->
             when parseWildcard afterMajorPeriod is
-                Ok afterWildcard ->
-                    Ok {
-                        minor: Err NotSpecified,
-                        afterMinor: afterWildcard,
-                        minorHasWildcard: Bool.true,
-                    }
-
+                Ok afterWildcard -> Ok (Wildcard, afterWildcard)
                 Err NotWildcard ->
                     (minor, afterMinor) <- parseNumericIdentifier afterMajorPeriod
                         |> Result.mapErr InvalidMinorConstraint
                         |> Result.try
 
-                    Ok {
-                        minor: Ok minor,
-                        afterMinor,
-                        minorHasWildcard: Bool.false,
-                    }
+                    Ok (Specific minor, afterMinor)
 
-parseComparatorPatchConstraint : { chars : List U8, minorHasWildcard : Bool }
-    -> Result
-        {
-            patch : Result U64 [NotSpecified],
-            afterPatch : List U8,
-            patchHasWildcard : Bool,
-        }
-        InvalidComparatorError
-parseComparatorPatchConstraint = \{ chars, minorHasWildcard } ->
+parseComparatorPatchConstraint : List U8 -> Result ([Specific U64, Wildcard, NotSpecified], List U8) InvalidComparatorError
+parseComparatorPatchConstraint = \chars ->
     when parseByte chars AsciiCode.period is
-        Err ByteNotFound ->
-            Ok {
-                patch: Err NotSpecified,
-                afterPatch: chars,
-                patchHasWildcard: Bool.false,
-            }
-
+        Err ByteNotFound -> Ok (NotSpecified, chars)
         Ok afterMajorPeriod ->
             when parseWildcard afterMajorPeriod is
-                Ok afterWildcard ->
-                    Ok {
-                        patch: Err NotSpecified,
-                        afterPatch: afterWildcard,
-                        patchHasWildcard: Bool.true,
-                    }
-
+                Ok afterWildcard -> Ok (Wildcard, afterWildcard)
                 Err NotWildcard ->
-                    if minorHasWildcard then
-                        Err PatchSpecifiedAfterMinorWildcard
-                    else
-                        (patch, afterPatch) <- parseNumericIdentifier afterMajorPeriod
-                            |> Result.mapErr InvalidPatchConstraint
-                            |> Result.try
+                    (patch, afterPatch) <- parseNumericIdentifier afterMajorPeriod
+                        |> Result.mapErr InvalidPatchConstraint
+                        |> Result.try
 
-                        Ok {
-                            patch: Ok patch,
-                            afterPatch,
-                            patchHasWildcard: Bool.false,
-                        }
+                    Ok (Specific patch, afterPatch)
 
-parseComparisonOperator : List U8 -> (Result ComparisonOperator [NoOperator], List U8)
-parseComparisonOperator = \chars ->
+parseComparatorPreRelease : List U8 -> Result (List Str, List U8) InvalidComparatorError
+parseComparatorPreRelease = \chars ->
     when chars is
-        [first, .. as rest] if first == AsciiCode.equals ->
-            (Ok Exact, rest)
+        [first, .. as rest] if first == AsciiCode.hyphen ->
+            parsePreRelease rest
+            |> Result.mapErr InvalidPreReleaseConstraint
 
-        [first, second, .. as rest] if first == AsciiCode.lessThan && second == AsciiCode.equals ->
-            (Ok LessThanOrEqualTo, rest)
+        _otherwise -> Ok ([], chars)
 
-        [first, .. as rest] if first == AsciiCode.lessThan ->
-            (Ok LessThan, rest)
+parseComparatorBuild : List U8 -> Result (List Str, List U8) InvalidComparatorError
+parseComparatorBuild = \chars ->
+    when chars is
+        [first, .. as rest] if first == AsciiCode.plus ->
+            parseBuild rest
+            |> Result.mapErr InvalidBuildConstraint
 
-        [first, second, .. as rest] if first == AsciiCode.greaterThan && second == AsciiCode.equals ->
-            (Ok GreaterThanOrEqualTo, rest)
-
-        [first, .. as rest] if first == AsciiCode.greaterThan ->
-            (Ok GreaterThan, rest)
-
-        [first, .. as rest] if first == AsciiCode.tilde ->
-            (Ok PatchUpdates, rest)
-
-        [first, .. as rest] if first == AsciiCode.caret ->
-            (Ok Compatible, rest)
-
-        _otherwise ->
-            (Err NoOperator, chars)
+        _otherwise -> Ok ([], chars)
 
 parseAlphanumericIdentifier : List U8 -> Result (Str, List U8) [MustHaveNonDigitChars]
 parseAlphanumericIdentifier = \chars ->
@@ -444,7 +395,7 @@ parseNumericIdentifier = \chars ->
 
         [first] ->
             if isDigit first then
-                Ok (0, [])
+                Ok (takeDigitsWhileStillNumeric [first])
             else
                 Err Empty
 
@@ -597,8 +548,8 @@ expect semver "0.1.0+?" == Err (InvalidBuild InvalidIdentifier)
 expect
     versionReq ">=1.2.3, <1.8.0-alpha.beta"
     == Ok [
-        { operator: GreaterThanOrEqualTo, major: 1, minor: Ok 2, patch: Ok 3, preRelease: [] },
-        { operator: LessThan, major: 1, minor: Ok 8, patch: Ok 0, preRelease: ["alpha", "beta"] },
+        Relation { operator: GreaterThanOrEqualTo, version: Full { major: 1, minor: 2, patch: 3, preRelease: [] } },
+        Relation { operator: LessThan, version: Full { major: 1, minor: 8, patch: 0, preRelease: ["alpha", "beta"] } },
     ]
 
 expect versionReq "" == Err (InvalidComparator { index: 0, error: InvalidMajorVersion Empty })
@@ -607,31 +558,31 @@ expect versionReq "*" == Ok []
 expect
     versionReq "123"
     == Ok [
-        { operator: Compatible, major: 123, minor: Err NotSpecified, patch: Err NotSpecified, preRelease: [] },
+        Relation { operator: Exact, version: Major 123 },
     ]
 
 expect
     versionReq "123.456"
     == Ok [
-        { operator: Compatible, major: 123, minor: Ok 456, patch: Err NotSpecified, preRelease: [] },
+        Relation { operator: Exact, version: MajorMinor 123 456 },
     ]
 
 expect
     versionReq "123.456.789"
     == Ok [
-        { operator: Compatible, major: 123, minor: Ok 456, patch: Ok 789, preRelease: [] },
+        Relation { operator: Exact, version: Full { major: 123, minor: 456, patch: 789, preRelease: [] } },
     ]
 
 expect
     versionReq "123.456.789-alpha"
     == Ok [
-        { operator: Compatible, major: 123, minor: Ok 456, patch: Ok 789, preRelease: ["alpha"] },
+        Relation { operator: Exact, version: Full { major: 123, minor: 456, patch: 789, preRelease: ["alpha"] } },
     ]
 
 expect
     versionReq "123.456.789-alpha+beta"
     == Ok [
-        { operator: Compatible, major: 123, minor: Ok 456, patch: Ok 789, preRelease: ["alpha"] },
+        Relation { operator: Exact, version: Full { major: 123, minor: 456, patch: 789, preRelease: ["alpha"] } },
     ]
 
 expect
@@ -645,25 +596,20 @@ expect
 expect
     versionReq "1.x"
     == Ok [
-        { operator: Wildcard, major: 1, minor: Err NotSpecified, patch: Err NotSpecified, preRelease: [] },
+        Wildcard (Major 1),
     ]
 
 expect
     versionReq "2.x.x"
-    == Ok [
-        { operator: Wildcard, major: 2, minor: Err NotSpecified, patch: Err NotSpecified, preRelease: [] },
-    ]
+    == Err (UnexpectedSuffix ".x")
 
 expect
     versionReq "2.x.3"
-    == Err (InvalidComparator { index: 0, error: PatchSpecifiedAfterMinorWildcard })
+    == Err (UnexpectedSuffix ".3")
 
 expect
     versionReqLazy "4.x ?"
-    == Ok (
-        [{ operator: Wildcard, major: 4, minor: Err NotSpecified, patch: Err NotSpecified, preRelease: [] }],
-        " ?",
-    )
+    == Ok ([Wildcard (Major 4)], " ?")
 
 expect versionReq "4.x ?" == Err (UnexpectedSuffix " ?")
 
@@ -683,11 +629,19 @@ expect
     == Err TooManyComparators
 
 expect
+    x = Parse.versionReq ">=1.2.2-alpha.beta, <2"
+    x
+    == Ok [
+        Relation { operator: GreaterThanOrEqualTo, version: Full { major: 1, minor: 2, patch: 2, preRelease: ["alpha", "beta"] } },
+        Relation { operator: LessThan, version: Major 2 },
+    ]
+
+expect
     parsedOperators =
-        ["=", ">", ">=", "<", "<=", "~", "^"]
+        ["=", ">", ">=", "<", "<=", "~", "^", ""]
         |> List.mapTry \op ->
-            when parseComparisonOperator (Str.toUtf8 op) is
-                (Ok oper, []) -> Ok oper
+            when parseComparatorOperator (Str.toUtf8 op) is
+                (oper, []) -> Ok oper
                 _other -> Err FailedToParse
 
     parsedOperators
@@ -699,9 +653,10 @@ expect
         LessThanOrEqualTo,
         PatchUpdates,
         Compatible,
+        Exact,
     ]
 
 expect
     Str.toUtf8 "."
-    |> parseComparisonOperator
-    == (Err NoOperator, [AsciiCode.period])
+    |> parseComparatorOperator
+    == (Exact, [AsciiCode.period])

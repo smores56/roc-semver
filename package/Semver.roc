@@ -3,10 +3,9 @@ module [
     parseLazy,
     toStr,
     compare,
-    Semver,
 ]
 
-import Types
+import Types exposing [Semver, Ordering]
 import Compare
 import Parse
 import Error exposing [InvalidSemverError]
@@ -59,7 +58,7 @@ parse = Parse.semver
 ##     rest: " abc",
 ## }
 ## ```
-parseLazy : Str -> Result { version : Semver, rest : Str } InvalidSemverError
+parseLazy : Str -> Result (Semver, Str) InvalidSemverError
 parseLazy = Parse.semverLazy
 
 ## Compare two semvers, useful for sorting.

@@ -1,3 +1,4 @@
+## ASCII codes useful for parsing data.
 module [
     zero,
     one,
