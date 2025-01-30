@@ -23,5 +23,5 @@ jobs:
         run: |
           for f in **/*.roc; do
             echo "Running tests for $f";
-            ./roc_nightly/roc test $f;
+            roc test $f;
           done
