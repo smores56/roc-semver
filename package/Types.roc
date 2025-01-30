@@ -15,7 +15,7 @@ Semver : {
     minor : U64,
     patch : U64,
     build : List Str,
-    preRelease : List Str,
+    pre_release : List Str,
 }
 
 ## A version requirement constraining semvers.
@@ -49,7 +49,7 @@ RelationComparatorVersion : [
             major : U64,
             minor : U64,
             patch : U64,
-            preRelease : List Str,
+            pre_release : List Str,
         },
 ]
 

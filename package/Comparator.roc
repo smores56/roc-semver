@@ -1,18 +1,20 @@
 module [
-    toStr,
+    to_str,
     parse,
-    parseLazy,
+    parse_lazy,
     accepts,
-    preReleaseIsCompatible,
+    pre_release_is_compatible,
 ]
 
 import Compare exposing [
-    comparePreReleases,
-    compareIfEqual,
+    compare_pre_releases,
+    compare_if_equal,
 ]
+
 import Error exposing [
     InvalidComparatorError,
 ]
+
 import Types exposing [
     Semver,
     Comparator,
@@ -32,33 +34,33 @@ import Parse
 ## relationComparator = Relation { operator: GreaterThan, version: Major 2 }
 ## expect toStr relationComparator == ">2"
 ## ```
-toStr : Comparator -> Str
-toStr = \comp ->
+to_str : Comparator -> Str
+to_str = |comp|
     when comp is
-        Wildcard version ->
+        Wildcard(version) ->
             when version is
                 Full -> "*"
-                Major major -> "$(Num.toStr major).*"
-                MajorMinor major minor -> "$(Num.toStr major).$(Num.toStr minor).*"
+                Major(major) -> "${Num.to_str(major)}.*"
+                MajorMinor(major, minor) -> "${Num.to_str(major)}.${Num.to_str(minor)}.*"
 
-        Relation { version, operator } ->
-            versionStr =
+        Relation({ version, operator }) ->
+            version_str =
                 when version is
-                    Major major -> "$(Num.toStr major)"
-                    MajorMinor major minor -> "$(Num.toStr major).$(Num.toStr minor)"
-                    Full { major, minor, patch, preRelease } ->
-                        preReleaseStr =
-                            if List.isEmpty preRelease then
+                    Major(major) -> "${Num.to_str(major)}"
+                    MajorMinor(major, minor) -> "${Num.to_str(major)}.${Num.to_str(minor)}"
+                    Full({ major, minor, patch, pre_release }) ->
+                        pre_release_str =
+                            if List.is_empty(pre_release) then
                                 ""
                             else
-                                "-$(Str.joinWith preRelease ".")"
+                                "-${Str.join_with(pre_release, ".")}"
 
-                        "$(Num.toStr major).$(Num.toStr minor).$(Num.toStr patch)$(preReleaseStr)"
+                        "${Num.to_str(major)}.${Num.to_str(minor)}.${Num.to_str(patch)}${pre_release_str}"
 
-            "$(operatorToStr operator)$(versionStr)"
+            "${operator_to_str(operator)}${version_str}"
 
-operatorToStr : ComparatorOperator -> Str
-operatorToStr = \operator ->
+operator_to_str : ComparatorOperator -> Str
+operator_to_str = |operator|
     when operator is
         Exact -> ""
         GreaterThan -> ">"
@@ -93,8 +95,8 @@ parse = Parse.comparator
 ##     " abc",
 ## )
 ## ```
-parseLazy : Str -> Result Comparator InvalidComparatorError
-parseLazy = Parse.comparator
+parse_lazy : Str -> Result Comparator InvalidComparatorError
+parse_lazy = Parse.comparator
 
 ## Whether a semver satisfies the constraint of a comparator.
 ##
@@ -114,64 +116,64 @@ parseLazy = Parse.comparator
 ## expect comparator |> matches version
 ## ```
 accepts : Comparator, Semver -> Bool
-accepts = \comp, semver ->
+accepts = |comp, semver|
     when comp is
-        Wildcard constraint -> acceptsWildcard constraint semver
-        Relation { version, operator } ->
+        Wildcard(constraint) -> accepts_wildcard(constraint, semver)
+        Relation({ version, operator }) ->
             when operator is
-                Exact -> compareRelationToVersion version semver == EQ
-                GreaterThan -> compareRelationToVersion version semver == GT
-                GreaterThanOrEqualTo -> compareRelationToVersion version semver != LT
-                LessThan -> compareRelationToVersion version semver == LT
-                LessThanOrEqualTo -> compareRelationToVersion version semver != GT
-                PatchUpdates -> acceptsPatchUpdates version semver
-                Compatible -> acceptsCompatible version semver
+                Exact -> compare_relation_to_version(version, semver) == EQ
+                GreaterThan -> compare_relation_to_version(version, semver) == GT
+                GreaterThanOrEqualTo -> compare_relation_to_version(version, semver) != LT
+                LessThan -> compare_relation_to_version(version, semver) == LT
+                LessThanOrEqualTo -> compare_relation_to_version(version, semver) != GT
+                PatchUpdates -> accepts_patch_updates(version, semver)
+                Compatible -> accepts_compatible(version, semver)
 
-acceptsWildcard : WildcardComparator, Semver -> Bool
-acceptsWildcard = \comp, version ->
+accepts_wildcard : WildcardComparator, Semver -> Bool
+accepts_wildcard = |comp, version|
     when comp is
         Full -> Bool.true
-        Major major -> version.major == major
-        MajorMinor major minor -> version.major == major && version.minor == minor
+        Major(major) -> version.major == major
+        MajorMinor(major, minor) -> version.major == major and version.minor == minor
 
-compareRelationToVersion : RelationComparatorVersion, Semver -> Ordering
-compareRelationToVersion = \comp, version ->
-    (compMajor, compMinor, compPatch, compPreRelease) =
+compare_relation_to_version : RelationComparatorVersion, Semver -> Ordering
+compare_relation_to_version = |comp, version|
+    (comp_major, comp_minor, comp_patch, comp_pre_release) =
         when comp is
-            Major major -> (major, version.minor, version.patch, version.preRelease)
-            MajorMinor major minor -> (major, minor, version.patch, version.preRelease)
-            Full { major, minor, patch, preRelease } -> (major, minor, patch, preRelease)
+            Major(major) -> (major, version.minor, version.patch, version.pre_release)
+            MajorMinor(major, minor) -> (major, minor, version.patch, version.pre_release)
+            Full({ major, minor, patch, pre_release }) -> (major, minor, patch, pre_release)
 
-    Num.compare version.major compMajor
-    |> compareIfEqual \{} -> Num.compare version.minor compMinor
-    |> compareIfEqual \{} -> Num.compare version.patch compPatch
-    |> compareIfEqual \{} -> comparePreReleases version.preRelease compPreRelease
+    Num.compare(version.major, comp_major)
+    |> compare_if_equal(|{}| Num.compare(version.minor, comp_minor))
+    |> compare_if_equal(|{}| Num.compare(version.patch, comp_patch))
+    |> compare_if_equal(|{}| compare_pre_releases(version.pre_release, comp_pre_release))
 
-acceptsPatchUpdates : RelationComparatorVersion, Semver -> Bool
-acceptsPatchUpdates = \comp, version ->
+accepts_patch_updates : RelationComparatorVersion, Semver -> Bool
+accepts_patch_updates = |comp, version|
     when comp is
-        Major major ->
+        Major(major) ->
             major == version.major
 
-        MajorMinor major minor ->
-            major == version.major && minor == version.minor
+        MajorMinor(major, minor) ->
+            major == version.major and minor == version.minor
 
-        Full { major, minor, patch, preRelease } ->
+        Full({ major, minor, patch, pre_release }) ->
             (major == version.major)
-            && (minor == version.minor)
-            && (patch <= version.patch)
-            && (comparePreReleases preRelease version.preRelease != GT)
+            and (minor == version.minor)
+            and (patch <= version.patch)
+            and (compare_pre_releases(pre_release, version.pre_release) != GT)
 
 ## Checks if a version is API-compatible with a comparator.
 ##
 ## The spec for semver v2.0.0 explains compatibility: <https://semver.org>
-acceptsCompatible : RelationComparatorVersion, Semver -> Bool
-acceptsCompatible = \comp, version ->
+accepts_compatible : RelationComparatorVersion, Semver -> Bool
+accepts_compatible = |comp, version|
     when comp is
-        Major major ->
+        Major(major) ->
             major == version.major
 
-        MajorMinor major minor ->
+        MajorMinor(major, minor) ->
             if major != version.major then
                 Bool.false
             else if major > 0 then
@@ -179,63 +181,63 @@ acceptsCompatible = \comp, version ->
             else
                 version.minor == minor
 
-        Full { major, minor, patch, preRelease } ->
+        Full({ major, minor, patch, pre_release }) ->
             if major != version.major then
                 Bool.false
-            else if major > 0 && version.minor != minor then
+            else if major > 0 and version.minor != minor then
                 version.minor > minor
-            else if major > 0 && version.patch != patch then
+            else if major > 0 and version.patch != patch then
                 version.patch > patch
-            else if minor > 0 && version.minor != minor then
+            else if minor > 0 and version.minor != minor then
                 Bool.false
-            else if minor > 0 && version.patch != patch then
+            else if minor > 0 and version.patch != patch then
                 version.patch > patch
-            else if version.minor != minor || version.patch != patch then
+            else if version.minor != minor or version.patch != patch then
                 Bool.false
             else
-                comparePreReleases version.preRelease preRelease != LT
+                compare_pre_releases(version.pre_release, pre_release) != LT
 
 ## Checks if a semver has a non-empty pre-release and matches all of
 ## its version segments.
-preReleaseIsCompatible : Comparator, Semver -> Bool
-preReleaseIsCompatible = \comparator, semver ->
+pre_release_is_compatible : Comparator, Semver -> Bool
+pre_release_is_compatible = |comparator, semver|
     when comparator is
-        Wildcard _wildcard -> Bool.false
-        Relation { version, operator: _ } ->
+        Wildcard(_wildcard) -> Bool.false
+        Relation({ version, operator: _ }) ->
             when version is
-                Major _major | MajorMinor _major _minor -> Bool.false
-                Full { major, minor, patch, preRelease } ->
+                Major(_major) | MajorMinor(_major, _minor) -> Bool.false
+                Full({ major, minor, patch, pre_release }) ->
                     (major == semver.major)
-                    && (minor == semver.minor)
-                    && (patch == semver.patch)
-                    && !(List.isEmpty preRelease)
+                    and (minor == semver.minor)
+                    and (patch == semver.patch)
+                    and !(List.is_empty(pre_release))
 
-testBaseSemver = { major: 1, minor: 2, patch: 3, preRelease: [], build: [] }
-testBaseCompVer = { major: 1, minor: 2, patch: 3, preRelease: [] }
-testBaseComparator = Relation { operator: Exact, version: Full testBaseCompVer }
+test_base_semver = { major: 1, minor: 2, patch: 3, pre_release: [], build: [] }
+test_base_comp_ver = { major: 1, minor: 2, patch: 3, pre_release: [] }
+test_base_comparator = Relation({ operator: Exact, version: Full(test_base_comp_ver) })
 
-expect accepts testBaseComparator testBaseSemver
-
-expect
-    comp = Relation { operator: LessThan, version: Full testBaseCompVer }
-    comp |> accepts testBaseSemver == Bool.false
+expect accepts(test_base_comparator, test_base_semver)
 
 expect
-    comp = Relation { operator: LessThanOrEqualTo, version: Full testBaseCompVer }
-    comp |> accepts testBaseSemver == Bool.true
+    comp = Relation({ operator: LessThan, version: Full(test_base_comp_ver) })
+    comp |> accepts(test_base_semver) == Bool.false
 
 expect
-    comp = Relation { operator: GreaterThan, version: Full testBaseCompVer }
-    comp |> accepts testBaseSemver == Bool.false
+    comp = Relation({ operator: LessThanOrEqualTo, version: Full(test_base_comp_ver) })
+    comp |> accepts(test_base_semver) == Bool.true
 
 expect
-    comp = Relation { operator: GreaterThanOrEqualTo, version: Full testBaseCompVer }
-    comp |> accepts testBaseSemver == Bool.true
+    comp = Relation({ operator: GreaterThan, version: Full(test_base_comp_ver) })
+    comp |> accepts(test_base_semver) == Bool.false
 
 expect
-    comp = Relation { operator: PatchUpdates, version: Full testBaseCompVer }
-    comp |> accepts testBaseSemver == Bool.true
+    comp = Relation({ operator: GreaterThanOrEqualTo, version: Full(test_base_comp_ver) })
+    comp |> accepts(test_base_semver) == Bool.true
 
 expect
-    comp = Relation { operator: Compatible, version: Full testBaseCompVer }
-    comp |> accepts testBaseSemver == Bool.true
+    comp = Relation({ operator: PatchUpdates, version: Full(test_base_comp_ver) })
+    comp |> accepts(test_base_semver) == Bool.true
+
+expect
+    comp = Relation({ operator: Compatible, version: Full(test_base_comp_ver) })
+    comp |> accepts(test_base_semver) == Bool.true

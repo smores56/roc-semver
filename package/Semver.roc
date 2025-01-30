@@ -1,7 +1,7 @@
 module [
     parse,
-    parseLazy,
-    toStr,
+    parse_lazy,
+    to_str,
     compare,
 ]
 
@@ -18,20 +18,20 @@ import Error exposing [InvalidSemverError]
 ##
 ## expect toStr version == versionStr
 ## ```
-toStr : Semver -> Str
-toStr = \{ major, minor, patch, build, preRelease } ->
-    preReleaseStr =
-        if List.isEmpty preRelease then
+to_str : Semver -> Str
+to_str = |{ major, minor, patch, build, pre_release }|
+    pre_release_str =
+        if List.is_empty(pre_release) then
             ""
         else
-            "-$(preRelease |> Str.joinWith ".")"
-    buildStr =
-        if List.isEmpty build then
+            "-${pre_release |> Str.join_with(".")}"
+    build_str =
+        if List.is_empty(build) then
             ""
         else
-            "+$(build |> Str.joinWith ".")"
+            "+${build |> Str.join_with(".")}"
 
-    "$(Num.toStr major).$(Num.toStr minor).$(Num.toStr patch)$(preReleaseStr)$(buildStr)"
+    "${Num.to_str(major)}.${Num.to_str(minor)}.${Num.to_str(patch)}${pre_release_str}${build_str}"
 
 ## Parse a semver from a string.
 ##
@@ -58,8 +58,8 @@ parse = Parse.semver
 ##     rest: " abc",
 ## }
 ## ```
-parseLazy : Str -> Result (Semver, Str) InvalidSemverError
-parseLazy = Parse.semverLazy
+parse_lazy : Str -> Result (Semver, Str) InvalidSemverError
+parse_lazy = Parse.semver_lazy
 
 ## Compare two semvers, useful for sorting.
 ##
@@ -70,12 +70,12 @@ parseLazy = Parse.semverLazy
 ## expect compare version1 version2 == LT
 ## ```
 compare : Semver, Semver -> Ordering
-compare = Compare.compareSemvers
+compare = Compare.compare_semvers
 
 expect
-    toStr { major: 1, minor: 2, patch: 3, build: [], preRelease: [] }
+    to_str({ major: 1, minor: 2, patch: 3, build: [], pre_release: [] })
     == "1.2.3"
 
 expect
-    toStr { major: 1, minor: 2, patch: 3, build: ["def-", "ghi"], preRelease: ["abc"] }
+    to_str({ major: 1, minor: 2, patch: 3, build: ["def-", "ghi"], pre_release: ["abc"] })
     == "1.2.3-abc+def-.ghi"
