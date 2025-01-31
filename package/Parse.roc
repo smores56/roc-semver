@@ -7,6 +7,7 @@ module [
     version_req_lazy,
 ]
 
+import AsciiCode
 import Types exposing [
     Semver,
     VersionReq,
@@ -33,14 +34,14 @@ semver_lazy = |s|
         parse_numeric_identifier(bytes)
         |> Result.map_err(InvalidMajorVersion)?
     after_major_dot =
-        parse_byte(after_major, '.')
+        parse_byte(after_major, AsciiCode.period)
         |> Result.map_err(|ByteNotFound| NoPeriodAfterMajorVersion)?
 
     (minor, after_minor) =
         parse_numeric_identifier(after_major_dot)
         |> Result.map_err(InvalidMinorVersion)?
     after_minor_dot =
-        parse_byte(after_minor, '.')
+        parse_byte(after_minor, AsciiCode.period)
         |> Result.map_err(|ByteNotFound| NoPeriodAfterMinorVersion)?
 
     (patch, after_patch) =
@@ -89,7 +90,7 @@ assert_semver_not_empty = |s|
 parse_optional_pre_release : List U8 -> Result (List Str, List U8) InvalidIdentifierError
 parse_optional_pre_release = |chars|
     when chars is
-        [first, .. as rest] if first == '-' -> parse_pre_release(rest)
+        [first, .. as rest] if first == AsciiCode.hyphen -> parse_pre_release(rest)
         _other -> Ok(([], chars))
 
 parse_pre_release : List U8 -> Result (List Str, List U8) InvalidIdentifierError
@@ -110,7 +111,7 @@ parse_pre_release = |chars|
 
     take_remaining_pre_release_identifiers = |tail_chars|
         when tail_chars is
-            [first, .. as rest] if first == '.' ->
+            [first, .. as rest] if first == AsciiCode.period ->
                 (identifier, remaining) =
                     parse_pre_release_identifier(rest)?
                 (found_identifiers, leftover) =
@@ -136,7 +137,7 @@ parse_pre_release = |chars|
 parse_optional_build : List U8 -> Result (List Str, List U8) InvalidIdentifierError
 parse_optional_build = |chars|
     when chars is
-        [first, .. as rest] if first == '+' -> parse_build(rest)
+        [first, .. as rest] if first == AsciiCode.plus -> parse_build(rest)
         _other -> Ok(([], chars))
 
 parse_build : List U8 -> Result (List Str, List U8) InvalidIdentifierError
@@ -153,7 +154,7 @@ parse_build = |chars|
 
     take_remaining_build_identifiers = |tail_chars|
         when tail_chars is
-            [first, .. as rest] if first == '.' ->
+            [first, .. as rest] if first == AsciiCode.period ->
                 (identifier, remaining) =
                     parse_build_identifier(rest)?
                 (found_identifiers, leftover) =
@@ -179,7 +180,7 @@ version_req_lazy : Str -> Result (VersionReq, Str) InvalidVersionReqError
 version_req_lazy = |s|
     take_comparators_while_present = |tail_chars, req_index|
         when tail_chars is
-            [first, .. as rest] if first == ',' ->
+            [first, .. as rest] if first == AsciiCode.comma ->
                 if req_index >= max_comparator_count then
                     Err(TooManyComparators)
                 else
@@ -293,25 +294,25 @@ parse_comparator = |chars|
 parse_comparator_operator : List U8 -> (ComparatorOperator, List U8)
 parse_comparator_operator = |chars|
     when chars is
-        [first, .. as rest] if first == '=' ->
+        [first, .. as rest] if first == AsciiCode.equals ->
             (Exact, rest)
 
-        [first, second, .. as rest] if first == '<' and second == '=' ->
+        [first, second, .. as rest] if first == AsciiCode.less_than and second == AsciiCode.equals ->
             (LessThanOrEqualTo, rest)
 
-        [first, .. as rest] if first == '<' ->
+        [first, .. as rest] if first == AsciiCode.less_than ->
             (LessThan, rest)
 
-        [first, second, .. as rest] if first == '>' and second == '=' ->
+        [first, second, .. as rest] if first == AsciiCode.greater_than and second == AsciiCode.equals ->
             (GreaterThanOrEqualTo, rest)
 
-        [first, .. as rest] if first == '>' ->
+        [first, .. as rest] if first == AsciiCode.greater_than ->
             (GreaterThan, rest)
 
-        [first, .. as rest] if first == '~' ->
+        [first, .. as rest] if first == AsciiCode.tilde ->
             (PatchUpdates, rest)
 
-        [first, .. as rest] if first == '^' ->
+        [first, .. as rest] if first == AsciiCode.caret ->
             (Compatible, rest)
 
         _otherwise ->
@@ -319,7 +320,7 @@ parse_comparator_operator = |chars|
 
 parse_comparator_minor_constraint : List U8 -> Result ([Specific U64, Wildcard, NotSpecified], List U8) InvalidComparatorError
 parse_comparator_minor_constraint = |chars|
-    when parse_byte(chars, '.') is
+    when parse_byte(chars, AsciiCode.period) is
         Err(ByteNotFound) -> Ok((NotSpecified, chars))
         Ok(after_major_period) ->
             when parse_wildcard(after_major_period) is
@@ -333,7 +334,7 @@ parse_comparator_minor_constraint = |chars|
 
 parse_comparator_patch_constraint : List U8 -> Result ([Specific U64, Wildcard, NotSpecified], List U8) InvalidComparatorError
 parse_comparator_patch_constraint = |chars|
-    when parse_byte(chars, '.') is
+    when parse_byte(chars, AsciiCode.period) is
         Err(ByteNotFound) -> Ok((NotSpecified, chars))
         Ok(after_major_period) ->
             when parse_wildcard(after_major_period) is
@@ -348,7 +349,7 @@ parse_comparator_patch_constraint = |chars|
 parse_comparator_pre_release : List U8 -> Result (List Str, List U8) InvalidComparatorError
 parse_comparator_pre_release = |chars|
     when chars is
-        [first, .. as rest] if first == '-' ->
+        [first, .. as rest] if first == AsciiCode.hyphen ->
             parse_pre_release(rest)
             |> Result.map_err(InvalidPreReleaseConstraint)
 
@@ -357,7 +358,7 @@ parse_comparator_pre_release = |chars|
 parse_comparator_build : List U8 -> Result (List Str, List U8) InvalidComparatorError
 parse_comparator_build = |chars|
     when chars is
-        [first, .. as rest] if first == '+' ->
+        [first, .. as rest] if first == AsciiCode.plus ->
             parse_build(rest)
             |> Result.map_err(InvalidBuildConstraint)
 
@@ -410,7 +411,7 @@ parse_numeric_identifier = |chars|
         [first, second, ..] ->
             if is_non_zero_digit(first) then
                 Ok(take_digits_while_still_numeric(chars))
-            else if first == '0' then
+            else if first == AsciiCode.zero then
                 if is_digit(second) then
                     Err(CannotStartWithZero)
                 else
@@ -426,7 +427,7 @@ parse_byte = |chars, byte|
 
 parse_wildcard : List U8 -> Result (List U8) [NotWildcard]
 parse_wildcard = |chars|
-    wildcard_chars = ['*', 'x', 'X']
+    wildcard_chars = [AsciiCode.star, AsciiCode.lower_x, AsciiCode.upper_x]
 
     when chars is
         [first, .. as rest] if List.contains(wildcard_chars, first) -> Ok(rest)
@@ -435,30 +436,30 @@ parse_wildcard = |chars|
 parse_digit : U8 -> Result U64 [InvalidDigit]
 parse_digit = |ascii_digit|
     if is_digit(ascii_digit) then
-        Ok(Num.to_u64((ascii_digit - '0')))
+        Ok(Num.to_u64((ascii_digit - AsciiCode.zero)))
     else
         Err(InvalidDigit)
 
 is_digit : U8 -> Bool
 is_digit = |char|
-    char >= '0' and char <= '9'
+    char >= AsciiCode.zero and char <= AsciiCode.nine
 
 is_non_zero_digit : U8 -> Bool
 is_non_zero_digit = |char|
-    char >= '1' and char <= '9'
+    char >= AsciiCode.one and char <= AsciiCode.nine
 
 is_letter : U8 -> Bool
 is_letter = |char|
     is_lowercase_letter =
-        char >= 'a' and char <= 'z'
+        char >= AsciiCode.lower_a and char <= AsciiCode.lower_z
     is_uppercase_letter =
-        char >= 'a' and char <= 'z'
+        char >= AsciiCode.lower_a and char <= AsciiCode.lower_z
 
     is_lowercase_letter or is_uppercase_letter
 
 is_non_digit : U8 -> Bool
 is_non_digit = |char|
-    char == '-' or is_letter(char)
+    char == AsciiCode.hyphen or is_letter(char)
 
 is_identifier_char : U8 -> Bool
 is_identifier_char = |char|
@@ -466,7 +467,7 @@ is_identifier_char = |char|
 
 is_space : U8 -> Bool
 is_space = |char|
-    char == ' '
+    char == AsciiCode.space
 
 take_chars_while : List U8, (U8 -> Bool) -> (List U8, List U8)
 take_chars_while = |chars, should_take_char|
@@ -705,4 +706,4 @@ expect
 expect
     Str.to_utf8(".")
     |> parse_comparator_operator
-    == (Exact, ['.'])
+    == (Exact, [AsciiCode.period])
