@@ -13,10 +13,10 @@ import Error exposing [InvalidSemverError]
 ## Render a semver to a string.
 ##
 ## ```roc
-## versionStr = "1.2.3-alpha+beta"
-## version = parse versionStr
+## version_str = "1.2.3-alpha+beta"
+## version = parse(version_str)?
 ##
-## expect toStr version == versionStr
+## expect to_str(version) == version_str
 ## ```
 to_str : Semver -> Str
 to_str = |{ major, minor, patch, build, pre_release }|
@@ -39,9 +39,9 @@ to_str = |{ major, minor, patch, build, pre_release }|
 ## twin function if you want to get the leftover text after parsing.
 ##
 ## ```roc
-## version = parse "1.2.3-alpha+beta"
+## version = parse("1.2.3-alpha+beta")
 ##
-## expect version == Ok { major: 1, minor: 2, patch: 3, preRelease: ["alpha"], build: ["beta"] }
+## expect version == Ok({ major: 1, minor: 2, patch: 3, pre_release: ["alpha"], build: ["beta"] })
 ## ```
 parse : Str -> Result Semver InvalidSemverError
 parse = Parse.semver
@@ -51,12 +51,12 @@ parse = Parse.semver
 ## If you don't need the leftover text, use the [parse] twin function.
 ##
 ## ```roc
-## version = parse "1.2.3 abc"
+## version = parse_lazy("1.2.3 abc")
 ##
-## expect version == Ok {
-##     version: { major: 1, minor: 2, patch: 3, preRelease: [], build: [] },
-##     rest: " abc",
-## }
+## expect version == Ok (
+##     { major: 1, minor: 2, patch: 3, pre_release: [], build: [] },
+##     " abc",
+## )
 ## ```
 parse_lazy : Str -> Result (Semver, Str) InvalidSemverError
 parse_lazy = Parse.semver_lazy
@@ -64,10 +64,10 @@ parse_lazy = Parse.semver_lazy
 ## Compare two semvers, useful for sorting.
 ##
 ## ```roc
-## version1 = { major: 1, minor: 2, patch: 3, preRelease: [], build: [] }
-## version2 = { major: 1, minor: 3, patch: 0, preRelease: [], build: [] }
+## version1 = { major: 1, minor: 2, patch: 3, pre_release: [], build: [] }
+## version2 = { major: 1, minor: 3, patch: 0, pre_release: [], build: [] }
 ##
-## expect compare version1 version2 == LT
+## expect compare(version1, version2) == LT
 ## ```
 compare : Semver, Semver -> Ordering
 compare = Compare.compare_semvers

@@ -23,14 +23,14 @@ star = []
 ## was parsed from, as we don't store ignored text, like whitespace.
 ##
 ## ```roc
-## versionReq = [
+## version_req = [
 ##     Relation { operator: Compatible, version: MajorMinor 2 5 },
 ##     Relation { operator: LessThan, version: Major 3 },
 ## ]
 ##
-## expect toStr versionReq == "^2.5, <3"
+## expect to_str(version_req) == "^2.5, <3"
 ##
-## expect toStr [] == "*"
+## expect to_str([]) == "*"
 ## ```
 to_str : VersionReq -> Str
 to_str = |version_req|
@@ -58,12 +58,12 @@ expect
 ## twin function if you want to get the leftover text after parsing.
 ##
 ## ```roc
-## versionReq = parse "1.2.*, <1.2.5"
+## version_req = parse("1.2.*, <1.2.5")
 ##
-## expect versionReq == Ok [
+## expect version_req == Ok ([
 ##     Wildcard (MajorMinor 1 2),
-##     Relation { operator: LessThan, version: Full { major: 1, minor: 2, patch: 5, preRelease: [] } },
-## ]
+##     Relation { operator: LessThan, version: Full { major: 1, minor: 2, patch: 5, pre_release: [] } },
+## ])
 ## ```
 parse : Str -> Result VersionReq InvalidVersionReqError
 parse = Parse.version_req
@@ -73,15 +73,16 @@ parse = Parse.version_req
 ## If you don't need the leftover text, use the [parse] twin function.
 ##
 ## ```roc
-## versionReq = parse "1.2.*, <1.2.5 ?"
+## version_req = parse_lazy("1.2.*, <1.2.5 ?")
 ##
-## expect versionReq == (
-##     Ok [
-##         Wildcard (MajorMinor 1 2),
-##         Relation { operator: LessThan, version: Full { major: 1, minor: 2, patch: 5, preRelease: [] } },
-##     ],
-##     " ?",
-## )
+## expect
+##     version_req == Ok (
+##         [
+##             Wildcard (MajorMinor 1 2),
+##             Relation { operator: LessThan, version: Full { major: 1, minor: 2, patch: 5, pre_release: [] } },
+##         ],
+##         " ?",
+##     )
 ## ```
 parse_lazy : Str -> Result (VersionReq, Str) InvalidVersionReqError
 parse_lazy = Parse.version_req_lazy
@@ -93,10 +94,10 @@ parse_lazy = Parse.version_req_lazy
 ## match the version's segments.
 ##
 ## ```roc
-## versionReq = [Relation { operator: Exact, version: Major 1 }]
-## semver = { major: 1, minor: 3, patch: 5, preRelease: [], build: [] }
+## version_req = [Relation { operator: Exact, version: Major 1 }]
+## semver = { major: 1, minor: 3, patch: 5, pre_release: [], build: [] }
 ##
-## expect versionReq |> matches semver
+## expect version_req |> matches(semver)
 ## ```
 matches : VersionReq, Semver -> Bool
 matches = |req, version|

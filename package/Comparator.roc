@@ -28,11 +28,11 @@ import Parse
 ## Render a comparator to a string.
 ##
 ## ```roc
-## wildcardComparator = Wildcard (MajorMinor 1 5)
-## expect toStr wildcardComparator == "1.5.*"
+## wildcard_comparator = Wildcard(MajorMinor(1, 5))
+## expect to_str(wildcard_comparator) == "1.5.*"
 ##
-## relationComparator = Relation { operator: GreaterThan, version: Major 2 }
-## expect toStr relationComparator == ">2"
+## relation_comparator = Relation({ operator: GreaterThan, version: Major(2) })
+## expect to_str(relation_comparator) == ">2"
 ## ```
 to_str : Comparator -> Str
 to_str = |comp|
@@ -76,9 +76,9 @@ operator_to_str = |operator|
 ## twin function if you want to get the leftover text after parsing.
 ##
 ## ```roc
-## comparator = parse ">=1.2"
+## comparator = parse(">=1.2")
 ##
-## expect comparator == Ok (Relation { operator: GreaterThanOrEqualTo, version: MajorMinor 1 2 })
+## expect comparator == Ok(Relation({ operator: GreaterThanOrEqualTo, version: MajorMinor(1, 2) }))
 ## ```
 parse : Str -> Result Comparator InvalidComparatorError
 parse = Parse.comparator
@@ -88,11 +88,11 @@ parse = Parse.comparator
 ## If you don't need the leftover text, use the [parse] twin function.
 ##
 ## ```roc
-## comparator = parseLazy ">=1.2 abc"
+## comparator = parse_lazy(">=1.2 abc")
 ##
-## expect comparator == Ok (
-##     Relation { operator: GreaterThanOrEqualTo, version: MajorMinor 1 2 }),
-##     " abc",
+## expect 
+##     comparator == Ok (
+##     Relation { operator: GreaterThanOrEqualTo, version: MajorMinor 1 2 }
 ## )
 ## ```
 parse_lazy : Str -> Result Comparator InvalidComparatorError
@@ -110,10 +110,10 @@ parse_lazy = Parse.comparator
 ##   hold the relation specified by the operator.
 ##
 ## ```roc
-## comparator = Relation { operator: LessThan, version: MajorMinor 1 3 }
-## version = { major: 1, minor: 2, patch: 10, preRelease: [], build: [] }
+## comparator = Relation({ operator: LessThan, version: MajorMinor 1 3 })
+## version = { major: 1, minor: 2, patch: 10, pre_release: [], build: [] }
 ##
-## expect comparator |> matches version
+## expect [comparator] |> matches(version)
 ## ```
 accepts : Comparator, Semver -> Bool
 accepts = |comp, semver|
