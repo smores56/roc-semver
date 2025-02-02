@@ -20,8 +20,4 @@ jobs:
           roc-version: nightly
           testing: "auto"
       - name: Run all tests
-        run: |
-          for f in **/*.roc; do
-            echo "Running tests for $f";
-            roc test $f;
-          done
+        run: roc test package/main.roc
