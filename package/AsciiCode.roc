@@ -3,42 +3,42 @@ module [
     zero,
     one,
     nine,
-    lowerA,
-    upperA,
-    lowerX,
-    upperX,
-    lowerZ,
-    upperZ,
+    lower_a,
+    upper_a,
+    lower_x,
+    upper_x,
+    lower_z,
+    upper_z,
     hyphen,
     space,
     star,
     period,
     plus,
     equals,
-    lessThan,
-    greaterThan,
+    less_than,
+    greater_than,
     tilde,
     caret,
     comma,
 ]
 
-zero = 48
-one = 49
-nine = 57
-lowerA = 97
-upperA = 65
-lowerX = 120
-upperX = 88
-lowerZ = 122
-upperZ = 90
-hyphen = 45
-space = 32
-star = 42
-period = 46
-plus = 43
-equals = 61
-lessThan = 60
-greaterThan = 62
-tilde = 126
-caret = 94
-comma = 44
+zero = '0'
+one = '1'
+nine = '9'
+lower_a = 'a'
+upper_a = 'A'
+lower_x = 'x'
+upper_x = 'X'
+lower_z = 'z'
+upper_z = 'Z'
+hyphen = '-'
+space = ' '
+star = '*'
+period = '.'
+plus = '+'
+equals = '='
+less_than = '<'
+greater_than = '>'
+tilde = '~'
+caret = '^'
+comma = ','

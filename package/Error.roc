@@ -1,9 +1,9 @@
 module [
-    invalidNumberErrorToStr,
-    invalidIdentifierErrorToStr,
-    invalidSemverErrorToStr,
-    invalidVersionReqErrorToStr,
-    invalidComparatorErrorToStr,
+    invalid_number_error_to_str,
+    invalid_identifier_error_to_str,
+    invalid_semver_error_to_str,
+    invalid_version_req_error_to_str,
+    invalid_comparator_error_to_str,
     InvalidNumberError,
     InvalidIdentifierError,
     InvalidSemverError,
@@ -19,8 +19,8 @@ InvalidNumberError : [
 ]
 
 ## Render an InvalidNumberError to a string.
-invalidNumberErrorToStr : InvalidNumberError -> Str
-invalidNumberErrorToStr = \error ->
+invalid_number_error_to_str : InvalidNumberError -> Str
+invalid_number_error_to_str = |error|
     when error is
         Empty -> "no more text to parse"
         InvalidNumber -> "not a valid number"
@@ -33,8 +33,8 @@ InvalidIdentifierError : [
 ]
 
 ## Render an InvalidIdentifierError to a string.
-invalidIdentifierErrorToStr : InvalidIdentifierError -> Str
-invalidIdentifierErrorToStr = \error ->
+invalid_identifier_error_to_str : InvalidIdentifierError -> Str
+invalid_identifier_error_to_str = |error|
     when error is
         EmptySegment -> "no more text to parse"
         InvalidIdentifier -> "invalid identifier found"
@@ -53,18 +53,18 @@ InvalidSemverError : [
 ]
 
 ## Render an InvalidSemverError to a string.
-invalidSemverErrorToStr : InvalidSemverError -> Str
-invalidSemverErrorToStr = \error ->
+invalid_semver_error_to_str : InvalidSemverError -> Str
+invalid_semver_error_to_str = |error|
     when error is
         EmptySemver -> "The semver was empty"
-        InvalidMajorVersion numErr -> "The major version was invalid: $(invalidNumberErrorToStr numErr)"
+        InvalidMajorVersion(num_err) -> "The major version was invalid: ${invalid_number_error_to_str(num_err)}"
         NoPeriodAfterMajorVersion -> "No period was found after the major version"
-        InvalidMinorVersion numErr -> "The minor version was invalid: $(invalidNumberErrorToStr numErr)"
+        InvalidMinorVersion(num_err) -> "The minor version was invalid: ${invalid_number_error_to_str(num_err)}"
         NoPeriodAfterMinorVersion -> "No period was found after the minor version"
-        InvalidPatchVersion numErr -> "The patch version was invalid: $(invalidNumberErrorToStr numErr)"
-        InvalidPreRelease idErr -> "The pre-release was invalid: $(invalidIdentifierErrorToStr idErr)"
-        InvalidBuild idErr -> "The build metadata was invalid: $(invalidIdentifierErrorToStr idErr)"
-        UnexpectedSuffix suffix -> "An unexpected suffix '$(suffix)' was found"
+        InvalidPatchVersion(num_err) -> "The patch version was invalid: ${invalid_number_error_to_str(num_err)}"
+        InvalidPreRelease(id_err) -> "The pre-release was invalid: ${invalid_identifier_error_to_str(id_err)}"
+        InvalidBuild(id_err) -> "The build metadata was invalid: ${invalid_identifier_error_to_str(id_err)}"
+        UnexpectedSuffix(suffix) -> "An unexpected suffix '${suffix}' was found"
 
 ## The provided version requirement is invalid.
 InvalidVersionReqError : [
@@ -74,13 +74,13 @@ InvalidVersionReqError : [
 ]
 
 ## Render an InvalidVersionReqError to a string.
-invalidVersionReqErrorToStr : InvalidVersionReqError -> Str
-invalidVersionReqErrorToStr = \err ->
+invalid_version_req_error_to_str : InvalidVersionReqError -> Str
+invalid_version_req_error_to_str = |err|
     when err is
         TooManyComparators -> "Only 32 comparators are allowed in one version requirement"
-        UnexpectedSuffix suffix -> "An unexpected suffix '$(suffix)' was found"
-        InvalidComparator { index, error } ->
-            "Invalid comparator at index $(Num.toStr index): $(invalidComparatorErrorToStr error)"
+        UnexpectedSuffix(suffix) -> "An unexpected suffix '${suffix}' was found"
+        InvalidComparator({ index, error }) ->
+            "Invalid comparator at index ${Num.to_str(index)}: ${invalid_comparator_error_to_str(error)}"
 
 ## The provided comparator is invalid.
 InvalidComparatorError : [
@@ -93,12 +93,12 @@ InvalidComparatorError : [
 ]
 
 ## Render an InvalidComparatorError to a string.
-invalidComparatorErrorToStr : InvalidComparatorError -> Str
-invalidComparatorErrorToStr = \error ->
+invalid_comparator_error_to_str : InvalidComparatorError -> Str
+invalid_comparator_error_to_str = |error|
     when error is
-        InvalidMajorVersion numErr -> "The major version was invalid: $(invalidNumberErrorToStr numErr)"
-        InvalidMinorConstraint numErr -> "The minor version was invalid: $(invalidNumberErrorToStr numErr)"
-        InvalidPatchConstraint numErr -> "The patch version was invalid: $(invalidNumberErrorToStr numErr)"
-        InvalidPreReleaseConstraint idErr -> "The pre-release was invalid: $(invalidIdentifierErrorToStr idErr)"
-        InvalidBuildConstraint idErr -> "The build metadata was invalid: $(invalidIdentifierErrorToStr idErr)"
-        UnexpectedSuffix suffix -> "An unexpected suffix '$(suffix)' was found"
+        InvalidMajorVersion(num_err) -> "The major version was invalid: ${invalid_number_error_to_str(num_err)}"
+        InvalidMinorConstraint(num_err) -> "The minor version was invalid: ${invalid_number_error_to_str(num_err)}"
+        InvalidPatchConstraint(num_err) -> "The patch version was invalid: ${invalid_number_error_to_str(num_err)}"
+        InvalidPreReleaseConstraint(id_err) -> "The pre-release was invalid: ${invalid_identifier_error_to_str(id_err)}"
+        InvalidBuildConstraint(id_err) -> "The build metadata was invalid: ${invalid_identifier_error_to_str(id_err)}"
+        UnexpectedSuffix(suffix) -> "An unexpected suffix '${suffix}' was found"

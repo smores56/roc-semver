@@ -1,10 +1,10 @@
 module [
     semver,
-    semverLazy,
+    semver_lazy,
     comparator,
-    comparatorLazy,
-    versionReq,
-    versionReqLazy,
+    comparator_lazy,
+    version_req,
+    version_req_lazy,
 ]
 
 import AsciiCode
@@ -22,286 +22,291 @@ import Error exposing [
     InvalidIdentifierError,
 ]
 
-maxComparatorCount = 32
+max_comparator_count = 32
 
-semverLazy : Str -> Result (Semver, Str) InvalidSemverError
-semverLazy = \s ->
-    {} <- assertSemverNotEmpty s
-        |> Result.try
+semver_lazy : Str -> Result (Semver, Str) InvalidSemverError
+semver_lazy = |s|
+    assert_semver_not_empty(s)?
 
-    bytes = Str.toUtf8 s
+    bytes = Str.to_utf8(s)
 
-    (major, afterMajor) <- parseNumericIdentifier bytes
-        |> Result.mapErr InvalidMajorVersion
-        |> Result.try
-    afterMajorDot <- parseByte afterMajor AsciiCode.period
-        |> Result.mapErr \ByteNotFound -> NoPeriodAfterMajorVersion
-        |> Result.try
+    (major, after_major) =
+        parse_numeric_identifier(bytes)
+        |> Result.map_err(InvalidMajorVersion)?
+    after_major_dot =
+        parse_byte(after_major, AsciiCode.period)
+        |> Result.map_err(|ByteNotFound| NoPeriodAfterMajorVersion)?
 
-    (minor, afterMinor) <- parseNumericIdentifier afterMajorDot
-        |> Result.mapErr InvalidMinorVersion
-        |> Result.try
-    afterMinorDot <- parseByte afterMinor AsciiCode.period
-        |> Result.mapErr \ByteNotFound -> NoPeriodAfterMinorVersion
-        |> Result.try
+    (minor, after_minor) =
+        parse_numeric_identifier(after_major_dot)
+        |> Result.map_err(InvalidMinorVersion)?
+    after_minor_dot =
+        parse_byte(after_minor, AsciiCode.period)
+        |> Result.map_err(|ByteNotFound| NoPeriodAfterMinorVersion)?
 
-    (patch, afterPatch) <- parseNumericIdentifier afterMinorDot
-        |> Result.mapErr InvalidPatchVersion
-        |> Result.try
+    (patch, after_patch) =
+        parse_numeric_identifier(after_minor_dot)
+        |> Result.map_err(InvalidPatchVersion)?
 
-    (preRelease, afterPreRelease) <- parseOptionalPreRelease afterPatch
-        |> Result.mapErr InvalidPreRelease
-        |> Result.try
-    (build, afterBuild) <- parseOptionalBuild afterPreRelease
-        |> Result.mapErr InvalidBuild
-        |> Result.try
+    (pre_release, after_pre_release) =
+        parse_optional_pre_release(after_patch)
+        |> Result.map_err(InvalidPreRelease)?
 
-    Ok (
-        {
-            major,
-            minor,
-            patch,
-            build,
-            preRelease,
-        },
-        afterBuild
-        |> Str.fromUtf8
-        |> Result.withDefault "",
+    (build, after_build) =
+        parse_optional_build(after_pre_release)
+        |> Result.map_err(InvalidBuild)?
+
+    Ok(
+        (
+            {
+                major,
+                minor,
+                patch,
+                build,
+                pre_release,
+            },
+            after_build
+            |> Str.from_utf8
+            |> Result.with_default(""),
+        ),
     )
 
 semver : Str -> Result Semver InvalidSemverError
-semver = \s ->
-    (version, rest) <- semverLazy s
-        |> Result.try
+semver = |s|
+    (version, rest) = semver_lazy(s)?
 
-    if Str.isEmpty rest then
-        Ok version
+    if Str.is_empty(rest) then
+        Ok(version)
     else
-        Err (UnexpectedSuffix rest)
+        Err(UnexpectedSuffix(rest))
 
-assertSemverNotEmpty : Str -> Result {} [EmptySemver]
-assertSemverNotEmpty = \s ->
-    if Str.isEmpty s then
-        Err EmptySemver
+assert_semver_not_empty : Str -> Result {} [EmptySemver]
+assert_semver_not_empty = |s|
+    if Str.is_empty(s) then
+        Err(EmptySemver)
     else
-        Ok {}
+        Ok({})
 
-parseOptionalPreRelease : List U8 -> Result (List Str, List U8) InvalidIdentifierError
-parseOptionalPreRelease = \chars ->
+parse_optional_pre_release : List U8 -> Result (List Str, List U8) InvalidIdentifierError
+parse_optional_pre_release = |chars|
     when chars is
-        [first, .. as rest] if first == AsciiCode.hyphen -> parsePreRelease rest
-        _other -> Ok ([], chars)
+        [first, .. as rest] if first == AsciiCode.hyphen -> parse_pre_release(rest)
+        _other -> Ok(([], chars))
 
-parsePreRelease : List U8 -> Result (List Str, List U8) InvalidIdentifierError
-parsePreRelease = \chars ->
-    parsePreReleaseIdentifier = \idChars ->
-        when parseAlphanumericIdentifier idChars is
-            Ok (identifier, rest) -> Ok (identifier, rest)
-            Err MustHaveNonDigitChars ->
-                when parseNumericIdentifier idChars is
-                    Ok (num, rest) -> Ok (Num.toStr num, rest)
-                    Err err ->
+parse_pre_release : List U8 -> Result (List Str, List U8) InvalidIdentifierError
+parse_pre_release = |chars|
+    parse_pre_release_identifier = |id_chars|
+        when parse_alphanumeric_identifier(id_chars) is
+            Ok((identifier, rest)) -> Ok((identifier, rest))
+            Err(MustHaveNonDigitChars) ->
+                when parse_numeric_identifier(id_chars) is
+                    Ok((num, rest)) -> Ok((Num.to_str(num), rest))
+                    Err(err) ->
                         when err is
                             Empty ->
-                                Err EmptySegment
+                                Err(EmptySegment)
 
                             CannotStartWithZero | InvalidNumber ->
-                                Err InvalidIdentifier
+                                Err(InvalidIdentifier)
 
-    takeRemainingPreReleaseIdentifiers = \tailChars ->
-        when tailChars is
+    take_remaining_pre_release_identifiers = |tail_chars|
+        when tail_chars is
             [first, .. as rest] if first == AsciiCode.period ->
-                (identifier, remaining) <- parsePreReleaseIdentifier rest
-                    |> Result.try
-                (foundIdentifiers, leftover) <- takeRemainingPreReleaseIdentifiers remaining
-                    |> Result.try
+                (identifier, remaining) =
+                    parse_pre_release_identifier(rest)?
+                (found_identifiers, leftover) =
+                    take_remaining_pre_release_identifiers(remaining)?
 
-                Ok (List.concat [identifier] foundIdentifiers, leftover)
+                Ok((List.concat([identifier], found_identifiers), leftover))
 
-            _other -> Ok ([], tailChars)
+            _other -> Ok(([], tail_chars))
 
-    when parsePreReleaseIdentifier chars is
-        Ok (firstIdentifier, afterFirstIdentifier) ->
-            (remainingIdentifiers, rest) <- takeRemainingPreReleaseIdentifiers afterFirstIdentifier
-                |> Result.try
+    when parse_pre_release_identifier(chars) is
+        Ok((first_identifier, after_first_identifier)) ->
+            (remaining_identifiers, rest) =
+                take_remaining_pre_release_identifiers(after_first_identifier)?
 
-            Ok (List.concat [firstIdentifier] remainingIdentifiers, rest)
+            Ok((List.concat([first_identifier], remaining_identifiers), rest))
 
-        Err err ->
-            if err == EmptySegment && !(List.isEmpty chars) then
-                Err InvalidIdentifier
+        Err(err) ->
+            if err == EmptySegment and !(List.is_empty(chars)) then
+                Err(InvalidIdentifier)
             else
-                Err err
+                Err(err)
 
-parseOptionalBuild : List U8 -> Result (List Str, List U8) InvalidIdentifierError
-parseOptionalBuild = \chars ->
+parse_optional_build : List U8 -> Result (List Str, List U8) InvalidIdentifierError
+parse_optional_build = |chars|
     when chars is
-        [first, .. as rest] if first == AsciiCode.plus -> parseBuild rest
-        _other -> Ok ([], chars)
+        [first, .. as rest] if first == AsciiCode.plus -> parse_build(rest)
+        _other -> Ok(([], chars))
 
-parseBuild : List U8 -> Result (List Str, List U8) InvalidIdentifierError
-parseBuild = \chars ->
-    parseBuildIdentifier = \idChars ->
-        when parseAlphanumericIdentifier idChars is
-            Ok (identifier, rest) -> Ok (identifier, rest)
-            Err MustHaveNonDigitChars ->
-                (digits, leftover) = takeCharsWhile idChars isDigit
-                if List.isEmpty digits then
-                    Err EmptySegment
+parse_build : List U8 -> Result (List Str, List U8) InvalidIdentifierError
+parse_build = |chars|
+    parse_build_identifier = |id_chars|
+        when parse_alphanumeric_identifier(id_chars) is
+            Ok((identifier, rest)) -> Ok((identifier, rest))
+            Err(MustHaveNonDigitChars) ->
+                (digits, leftover) = take_chars_while(id_chars, is_digit)
+                if List.is_empty(digits) then
+                    Err(EmptySegment)
                 else
-                    Ok (digits |> Str.fromUtf8 |> Result.withDefault "", leftover)
+                    Ok((digits |> Str.from_utf8 |> Result.with_default(""), leftover))
 
-    takeRemainingBuildIdentifiers = \tailChars ->
-        when tailChars is
+    take_remaining_build_identifiers = |tail_chars|
+        when tail_chars is
             [first, .. as rest] if first == AsciiCode.period ->
-                (identifier, remaining) <- parseBuildIdentifier rest
-                    |> Result.try
-                (foundIdentifiers, leftover) <- takeRemainingBuildIdentifiers remaining
-                    |> Result.try
+                (identifier, remaining) =
+                    parse_build_identifier(rest)?
+                (found_identifiers, leftover) =
+                    take_remaining_build_identifiers(remaining)?
+                Ok((List.concat([identifier], found_identifiers), leftover))
 
-                Ok (List.concat [identifier] foundIdentifiers, leftover)
+            _other -> Ok(([], tail_chars))
 
-            _other -> Ok ([], tailChars)
+    when parse_build_identifier(chars) is
+        Ok((first_identifier, after_first_identifier)) ->
+            (remaining_identifiers, rest) =
+                take_remaining_build_identifiers(after_first_identifier)?
 
-    when parseBuildIdentifier chars is
-        Ok (firstIdentifier, afterFirstIdentifier) ->
-            (remainingIdentifiers, rest) <- takeRemainingBuildIdentifiers afterFirstIdentifier
-                |> Result.try
+            Ok((List.concat([first_identifier], remaining_identifiers), rest))
 
-            Ok (List.concat [firstIdentifier] remainingIdentifiers, rest)
-
-        Err err ->
-            if err == EmptySegment && !(List.isEmpty chars) then
-                Err InvalidIdentifier
+        Err(err) ->
+            if err == EmptySegment and !(List.is_empty(chars)) then
+                Err(InvalidIdentifier)
             else
-                Err err
+                Err(err)
 
-versionReqLazy : Str -> Result (VersionReq, Str) InvalidVersionReqError
-versionReqLazy = \s ->
-    takeComparatorsWhilePresent = \tailChars, reqIndex ->
-        when tailChars is
+version_req_lazy : Str -> Result (VersionReq, Str) InvalidVersionReqError
+version_req_lazy = |s|
+    take_comparators_while_present = |tail_chars, req_index|
+        when tail_chars is
             [first, .. as rest] if first == AsciiCode.comma ->
-                if reqIndex >= maxComparatorCount then
-                    Err TooManyComparators
+                if req_index >= max_comparator_count then
+                    Err(TooManyComparators)
                 else
-                    tailAfterSpaces = dropCharsWhile rest isSpace
-                    (comp, afterComp) <- parseComparator tailAfterSpaces
-                        |> Result.mapErr \error -> InvalidComparator { index: reqIndex, error }
-                        |> Result.try
-                    (comps, afterComps) <- takeComparatorsWhilePresent afterComp (reqIndex + 1)
-                        |> Result.try
+                    tail_after_spaces = drop_chars_while(rest, is_space)
+                    (comp, after_comp) =
+                        parse_comparator(tail_after_spaces)
+                        |> Result.map_err(|error| InvalidComparator({ index: req_index, error }))?
+                    (comps, after_comps) =
+                        take_comparators_while_present(after_comp, (req_index + 1))?
 
-                    Ok (List.concat [comp] comps, afterComps)
+                    Ok((List.concat([comp], comps), after_comps))
 
-            _otherwise -> Ok ([], tailChars)
+            _otherwise -> Ok(([], tail_chars))
 
-    afterSpaces =
-        Str.toUtf8 s
-        |> dropCharsWhile isSpace
+    after_spaces =
+        Str.to_utf8(s)
+        |> drop_chars_while(is_space)
 
-    when parseWildcard afterSpaces is
-        Ok afterWildcard -> Ok ([], Str.fromUtf8 afterWildcard |> Result.withDefault "")
-        Err NotWildcard ->
-            (firstComparator, afterFirstComparator) <- parseComparator afterSpaces
-                |> Result.mapErr \error -> InvalidComparator { index: 0, error }
-                |> Result.try
+    when parse_wildcard(after_spaces) is
+        Ok(after_wildcard) -> Ok(([], Str.from_utf8(after_wildcard) |> Result.with_default("")))
+        Err(NotWildcard) ->
+            (first_comparator, after_first_comparator) =
+                parse_comparator(after_spaces)
+                |> Result.map_err(|error| InvalidComparator({ index: 0, error }))?
 
-            (otherComparators, afterOtherComparators) <- takeComparatorsWhilePresent afterFirstComparator 1
-                |> Result.try
+            (other_comparators, after_other_comparators) =
+                take_comparators_while_present(after_first_comparator, 1)?
 
-            Ok (
-                List.concat [firstComparator] otherComparators,
-                Str.fromUtf8 afterOtherComparators |> Result.withDefault "",
+            Ok(
+                (
+                    List.concat([first_comparator], other_comparators),
+                    Str.from_utf8(after_other_comparators) |> Result.with_default(""),
+                ),
             )
 
-versionReq : Str -> Result VersionReq InvalidVersionReqError
-versionReq = \s ->
-    (verReq, rest) <- versionReqLazy s
-        |> Result.try
+version_req : Str -> Result VersionReq InvalidVersionReqError
+version_req = |s|
+    (ver_req, rest) = version_req_lazy(s)?
 
-    if Str.isEmpty rest then
-        Ok verReq
+    if Str.is_empty(rest) then
+        Ok(ver_req)
     else
-        Err (UnexpectedSuffix rest)
+        Err(UnexpectedSuffix(rest))
 
-comparatorLazy : Str -> Result (Comparator, Str) InvalidComparatorError
-comparatorLazy = \s ->
-    (comp, rest) <- parseComparator (Str.toUtf8 s)
-        |> Result.try
+comparator_lazy : Str -> Result (Comparator, Str) InvalidComparatorError
+comparator_lazy = |s|
+    (comp, rest) = parse_comparator(Str.to_utf8(s))?
 
-    Ok (comp, Str.fromUtf8 rest |> Result.withDefault "")
+    Ok((comp, Str.from_utf8(rest) |> Result.with_default("")))
 
 comparator : Str -> Result Comparator InvalidComparatorError
-comparator = \s ->
-    (comp, rest) <- comparatorLazy s
-        |> Result.try
+comparator = |s|
+    (comp, rest) = comparator_lazy(s)?
 
-    if Str.isEmpty rest then
-        Ok comp
+    if Str.is_empty(rest) then
+        Ok(comp)
     else
-        Err (UnexpectedSuffix rest)
+        Err(UnexpectedSuffix(rest))
 
-parseComparator : List U8 -> Result (Comparator, List U8) InvalidComparatorError
-parseComparator = \chars ->
-    when parseWildcard chars is
-        Ok afterWildcard ->
-            Ok (Wildcard Full, afterWildcard)
+parse_comparator : List U8 -> Result (Comparator, List U8) InvalidComparatorError
+parse_comparator = |chars|
+    when parse_wildcard(chars) is
+        Ok(after_wildcard) ->
+            Ok((Wildcard(Full), after_wildcard))
 
-        Err NotWildcard ->
-            (operator, afterOperator) = parseComparatorOperator chars
-            afterSpaces = dropCharsWhile afterOperator isSpace
+        Err(NotWildcard) ->
+            (operator, after_operator) = parse_comparator_operator(chars)
+            after_spaces = drop_chars_while(after_operator, is_space)
 
-            (major, afterMajor) <- parseNumericIdentifier afterSpaces
-                |> Result.mapErr InvalidMajorVersion
-                |> Result.try
-            (minor, afterMinor) <- parseComparatorMinorConstraint afterMajor
-                |> Result.try
+            (major, after_major) =
+                parse_numeric_identifier(after_spaces)
+                |> Result.map_err(InvalidMajorVersion)?
+            (minor, after_minor) =
+                parse_comparator_minor_constraint(after_major)?
 
             when minor is
-                NotSpecified -> Ok (Relation { operator, version: Major major }, afterMinor)
-                Wildcard -> Ok (Wildcard (Major major), afterMinor)
-                Specific specificMinor ->
-                    (patch, afterPatch) <- parseComparatorPatchConstraint afterMinor
-                        |> Result.try
+                NotSpecified -> Ok((Relation({ operator, version: Major(major) }), after_minor))
+                Wildcard -> Ok((Wildcard(Major(major)), after_minor))
+                Specific(specific_minor) ->
+                    (patch, after_patch) =
+                        parse_comparator_patch_constraint(after_minor)?
 
                     when patch is
-                        NotSpecified -> Ok (Relation { operator, version: MajorMinor major specificMinor }, afterPatch)
-                        Wildcard -> Ok (Wildcard (MajorMinor major specificMinor), afterPatch)
-                        Specific specificPatch ->
-                            (preRelease, afterPreRelease) <- parseComparatorPreRelease afterPatch
-                                |> Result.try
-                            (_build, afterBuild) <- parseComparatorBuild afterPreRelease
-                                |> Result.try
+                        NotSpecified -> Ok((Relation({ operator, version: MajorMinor(major, specific_minor) }), after_patch))
+                        Wildcard -> Ok((Wildcard(MajorMinor(major, specific_minor)), after_patch))
+                        Specific(specific_patch) ->
+                            (pre_release, after_pre_release) =
+                                parse_comparator_pre_release(after_patch)?
+                            (_build, after_build) =
+                                parse_comparator_build(after_pre_release)?
 
-                            Ok (
-                                Relation {
-                                    operator,
-                                    version: Full {
-                                        major,
-                                        minor: specificMinor,
-                                        patch: specificPatch,
-                                        preRelease,
-                                    },
-                                },
-                                afterBuild,
+                            Ok(
+                                (
+                                    Relation(
+                                        {
+                                            operator,
+                                            version: Full(
+                                                {
+                                                    major,
+                                                    minor: specific_minor,
+                                                    patch: specific_patch,
+                                                    pre_release,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                    after_build,
+                                ),
                             )
 
-parseComparatorOperator : List U8 -> (ComparatorOperator, List U8)
-parseComparatorOperator = \chars ->
+parse_comparator_operator : List U8 -> (ComparatorOperator, List U8)
+parse_comparator_operator = |chars|
     when chars is
         [first, .. as rest] if first == AsciiCode.equals ->
             (Exact, rest)
 
-        [first, second, .. as rest] if first == AsciiCode.lessThan && second == AsciiCode.equals ->
+        [first, second, .. as rest] if first == AsciiCode.less_than and second == AsciiCode.equals ->
             (LessThanOrEqualTo, rest)
 
-        [first, .. as rest] if first == AsciiCode.lessThan ->
+        [first, .. as rest] if first == AsciiCode.less_than ->
             (LessThan, rest)
 
-        [first, second, .. as rest] if first == AsciiCode.greaterThan && second == AsciiCode.equals ->
+        [first, second, .. as rest] if first == AsciiCode.greater_than and second == AsciiCode.equals ->
             (GreaterThanOrEqualTo, rest)
 
-        [first, .. as rest] if first == AsciiCode.greaterThan ->
+        [first, .. as rest] if first == AsciiCode.greater_than ->
             (GreaterThan, rest)
 
         [first, .. as rest] if first == AsciiCode.tilde ->
@@ -313,350 +318,392 @@ parseComparatorOperator = \chars ->
         _otherwise ->
             (Exact, chars)
 
-parseComparatorMinorConstraint : List U8 -> Result ([Specific U64, Wildcard, NotSpecified], List U8) InvalidComparatorError
-parseComparatorMinorConstraint = \chars ->
-    when parseByte chars AsciiCode.period is
-        Err ByteNotFound -> Ok (NotSpecified, chars)
-        Ok afterMajorPeriod ->
-            when parseWildcard afterMajorPeriod is
-                Ok afterWildcard -> Ok (Wildcard, afterWildcard)
-                Err NotWildcard ->
-                    (minor, afterMinor) <- parseNumericIdentifier afterMajorPeriod
-                        |> Result.mapErr InvalidMinorConstraint
-                        |> Result.try
+parse_comparator_minor_constraint : List U8 -> Result ([Specific U64, Wildcard, NotSpecified], List U8) InvalidComparatorError
+parse_comparator_minor_constraint = |chars|
+    when parse_byte(chars, AsciiCode.period) is
+        Err(ByteNotFound) -> Ok((NotSpecified, chars))
+        Ok(after_major_period) ->
+            when parse_wildcard(after_major_period) is
+                Ok(after_wildcard) -> Ok((Wildcard, after_wildcard))
+                Err(NotWildcard) ->
+                    (minor, after_minor) =
+                        parse_numeric_identifier(after_major_period)
+                        |> Result.map_err(InvalidMinorConstraint)?
 
-                    Ok (Specific minor, afterMinor)
+                    Ok((Specific(minor), after_minor))
 
-parseComparatorPatchConstraint : List U8 -> Result ([Specific U64, Wildcard, NotSpecified], List U8) InvalidComparatorError
-parseComparatorPatchConstraint = \chars ->
-    when parseByte chars AsciiCode.period is
-        Err ByteNotFound -> Ok (NotSpecified, chars)
-        Ok afterMajorPeriod ->
-            when parseWildcard afterMajorPeriod is
-                Ok afterWildcard -> Ok (Wildcard, afterWildcard)
-                Err NotWildcard ->
-                    (patch, afterPatch) <- parseNumericIdentifier afterMajorPeriod
-                        |> Result.mapErr InvalidPatchConstraint
-                        |> Result.try
+parse_comparator_patch_constraint : List U8 -> Result ([Specific U64, Wildcard, NotSpecified], List U8) InvalidComparatorError
+parse_comparator_patch_constraint = |chars|
+    when parse_byte(chars, AsciiCode.period) is
+        Err(ByteNotFound) -> Ok((NotSpecified, chars))
+        Ok(after_major_period) ->
+            when parse_wildcard(after_major_period) is
+                Ok(after_wildcard) -> Ok((Wildcard, after_wildcard))
+                Err(NotWildcard) ->
+                    (patch, after_patch) =
+                        parse_numeric_identifier(after_major_period)
+                        |> Result.map_err(InvalidPatchConstraint)?
 
-                    Ok (Specific patch, afterPatch)
+                    Ok((Specific(patch), after_patch))
 
-parseComparatorPreRelease : List U8 -> Result (List Str, List U8) InvalidComparatorError
-parseComparatorPreRelease = \chars ->
+parse_comparator_pre_release : List U8 -> Result (List Str, List U8) InvalidComparatorError
+parse_comparator_pre_release = |chars|
     when chars is
         [first, .. as rest] if first == AsciiCode.hyphen ->
-            parsePreRelease rest
-            |> Result.mapErr InvalidPreReleaseConstraint
+            parse_pre_release(rest)
+            |> Result.map_err(InvalidPreReleaseConstraint)
 
-        _otherwise -> Ok ([], chars)
+        _otherwise -> Ok(([], chars))
 
-parseComparatorBuild : List U8 -> Result (List Str, List U8) InvalidComparatorError
-parseComparatorBuild = \chars ->
+parse_comparator_build : List U8 -> Result (List Str, List U8) InvalidComparatorError
+parse_comparator_build = |chars|
     when chars is
         [first, .. as rest] if first == AsciiCode.plus ->
-            parseBuild rest
-            |> Result.mapErr InvalidBuildConstraint
+            parse_build(rest)
+            |> Result.map_err(InvalidBuildConstraint)
 
-        _otherwise -> Ok ([], chars)
+        _otherwise -> Ok(([], chars))
 
-parseAlphanumericIdentifier : List U8 -> Result (Str, List U8) [MustHaveNonDigitChars]
-parseAlphanumericIdentifier = \chars ->
-    (digitChars, charsAfterDigits) = takeCharsWhile chars isDigit
-    (nonDigitChars, charsAfterNonDigits) = takeCharsWhile charsAfterDigits isNonDigit
+parse_alphanumeric_identifier : List U8 -> Result (Str, List U8) [MustHaveNonDigitChars]
+parse_alphanumeric_identifier = |chars|
+    (digit_chars, chars_after_digits) = take_chars_while(chars, is_digit)
+    (non_digit_chars, chars_after_non_digits) = take_chars_while(chars_after_digits, is_non_digit)
 
-    if List.isEmpty nonDigitChars then
-        Err MustHaveNonDigitChars
+    if List.is_empty(non_digit_chars) then
+        Err(MustHaveNonDigitChars)
     else
-        (otherIdentifierChars, restOfChars) = takeCharsWhile charsAfterNonDigits isIdentifierChar
+        (other_identifier_chars, rest_of_chars) = take_chars_while(chars_after_non_digits, is_identifier_char)
 
-        alphanumericIdentifier =
-            digitChars
-            |> List.concat nonDigitChars
-            |> List.concat otherIdentifierChars
-            |> Str.fromUtf8
-            |> Result.withDefault ""
+        alphanumeric_identifier =
+            digit_chars
+            |> List.concat(non_digit_chars)
+            |> List.concat(other_identifier_chars)
+            |> Str.from_utf8
+            |> Result.with_default("")
 
-        Ok (alphanumericIdentifier, restOfChars)
+        Ok((alphanumeric_identifier, rest_of_chars))
 
-parseNumericIdentifier : List U8 -> Result (U64, List U8) InvalidNumberError
-parseNumericIdentifier = \chars ->
-    takeDigitsWhileStillNumeric = \digitChars ->
-        List.walkUntil digitChars (0, digitChars) \(totalNum, untaken), char ->
-            when parseDigit char is
-                Err InvalidDigit ->
-                    Break (totalNum, untaken)
+parse_numeric_identifier : List U8 -> Result (U64, List U8) InvalidNumberError
+parse_numeric_identifier = |chars|
+    take_digits_while_still_numeric = |digit_chars|
+        List.walk_until(
+            digit_chars,
+            (0, digit_chars),
+            |(total_num, untaken), char|
+                when parse_digit(char) is
+                    Err(InvalidDigit) ->
+                        Break((total_num, untaken))
 
-                Ok num ->
-                    Continue (10 * totalNum + num, List.dropFirst untaken 1)
+                    Ok(num) ->
+                        Continue((10 * total_num + num, List.drop_first(untaken, 1))),
+        )
 
     when chars is
         [] ->
-            Err Empty
+            Err(Empty)
 
         [first] ->
-            if isDigit first then
-                Ok (takeDigitsWhileStillNumeric [first])
+            if is_digit(first) then
+                Ok(take_digits_while_still_numeric([first]))
             else
-                Err Empty
+                Err(Empty)
 
         [first, second, ..] ->
-            if isNonZeroDigit first then
-                Ok (takeDigitsWhileStillNumeric chars)
+            if is_non_zero_digit(first) then
+                Ok(take_digits_while_still_numeric(chars))
             else if first == AsciiCode.zero then
-                if isDigit second then
-                    Err CannotStartWithZero
+                if is_digit(second) then
+                    Err(CannotStartWithZero)
                 else
-                    Ok (0, chars |> List.dropFirst 1)
+                    Ok((0, chars |> List.drop_first(1)))
             else
-                Err Empty
+                Err(Empty)
 
-parseByte : List U8, U8 -> Result (List U8) [ByteNotFound]
-parseByte = \chars, byte ->
+parse_byte : List U8, U8 -> Result (List U8) [ByteNotFound]
+parse_byte = |chars, byte|
     when chars is
-        [first, .. as rest] if first == byte -> Ok rest
-        _notFound -> Err ByteNotFound
+        [first, .. as rest] if first == byte -> Ok(rest)
+        _notFound -> Err(ByteNotFound)
 
-parseWildcard : List U8 -> Result (List U8) [NotWildcard]
-parseWildcard = \chars ->
-    wildcardChars = [AsciiCode.star, AsciiCode.lowerX, AsciiCode.upperX]
+parse_wildcard : List U8 -> Result (List U8) [NotWildcard]
+parse_wildcard = |chars|
+    wildcard_chars = [AsciiCode.star, AsciiCode.lower_x, AsciiCode.upper_x]
 
     when chars is
-        [first, .. as rest] if List.contains wildcardChars first -> Ok rest
-        _otherwise -> Err NotWildcard
+        [first, .. as rest] if List.contains(wildcard_chars, first) -> Ok(rest)
+        _otherwise -> Err(NotWildcard)
 
-parseDigit : U8 -> Result U64 [InvalidDigit]
-parseDigit = \asciiDigit ->
-    if isDigit asciiDigit then
-        Ok (Num.toU64 (asciiDigit - AsciiCode.zero))
+parse_digit : U8 -> Result U64 [InvalidDigit]
+parse_digit = |ascii_digit|
+    if is_digit(ascii_digit) then
+        Ok(Num.to_u64((ascii_digit - AsciiCode.zero)))
     else
-        Err InvalidDigit
+        Err(InvalidDigit)
 
-isDigit : U8 -> Bool
-isDigit = \char ->
-    char >= AsciiCode.zero && char <= AsciiCode.nine
+is_digit : U8 -> Bool
+is_digit = |char|
+    char >= AsciiCode.zero and char <= AsciiCode.nine
 
-isNonZeroDigit : U8 -> Bool
-isNonZeroDigit = \char ->
-    char >= AsciiCode.one && char <= AsciiCode.nine
+is_non_zero_digit : U8 -> Bool
+is_non_zero_digit = |char|
+    char >= AsciiCode.one and char <= AsciiCode.nine
 
-isLetter : U8 -> Bool
-isLetter = \char ->
-    isLowercaseLetter =
-        char >= AsciiCode.lowerA && char <= AsciiCode.lowerZ
-    isUppercaseLetter =
-        char >= AsciiCode.upperA && char <= AsciiCode.upperZ
+is_letter : U8 -> Bool
+is_letter = |char|
+    is_lowercase_letter =
+        char >= AsciiCode.lower_a and char <= AsciiCode.lower_z
+    is_uppercase_letter =
+        char >= AsciiCode.lower_a and char <= AsciiCode.lower_z
 
-    isLowercaseLetter || isUppercaseLetter
+    is_lowercase_letter or is_uppercase_letter
 
-isNonDigit : U8 -> Bool
-isNonDigit = \char ->
-    char == AsciiCode.hyphen || isLetter char
+is_non_digit : U8 -> Bool
+is_non_digit = |char|
+    char == AsciiCode.hyphen or is_letter(char)
 
-isIdentifierChar : U8 -> Bool
-isIdentifierChar = \char ->
-    isNonDigit char || isDigit char
+is_identifier_char : U8 -> Bool
+is_identifier_char = |char|
+    is_non_digit(char) or is_digit(char)
 
-isSpace : U8 -> Bool
-isSpace = \char ->
+is_space : U8 -> Bool
+is_space = |char|
     char == AsciiCode.space
 
-takeCharsWhile : List U8, (U8 -> Bool) -> (List U8, List U8)
-takeCharsWhile = \chars, shouldTakeChar ->
-    List.walkUntil chars ([], chars) \(taken, untaken), char ->
-        if shouldTakeChar char then
-            Continue (List.append taken char, List.dropFirst untaken 1)
-        else
-            Break (taken, untaken)
-
-dropCharsWhile : List U8, (U8 -> Bool) -> List U8
-dropCharsWhile = \chars, shouldDropChar ->
-    numberOfCharsToDrop =
-        List.walkUntil chars 0 \droppedSoFar, char ->
-            if shouldDropChar char then
-                Continue (droppedSoFar + 1)
+take_chars_while : List U8, (U8 -> Bool) -> (List U8, List U8)
+take_chars_while = |chars, should_take_char|
+    List.walk_until(
+        chars,
+        ([], chars),
+        |(taken, untaken), char|
+            if should_take_char(char) then
+                Continue((List.append(taken, char), List.drop_first(untaken, 1)))
             else
-                Break droppedSoFar
+                Break((taken, untaken)),
+    )
+
+drop_chars_while : List U8, (U8 -> Bool) -> List U8
+drop_chars_while = |chars, should_drop_char|
+    number_of_chars_to_drop =
+        List.walk_until(
+            chars,
+            0,
+            |dropped_so_far, char|
+                if should_drop_char(char) then
+                    Continue((dropped_so_far + 1))
+                else
+                    Break(dropped_so_far),
+        )
 
     chars
-    |> List.dropFirst numberOfCharsToDrop
+    |> List.drop_first(number_of_chars_to_drop)
 
-expect semver "" == Err EmptySemver
-expect semver "0" == Err NoPeriodAfterMajorVersion
-expect semver "0." == Err (InvalidMinorVersion Empty)
-expect semver "0.1" == Err NoPeriodAfterMinorVersion
-expect semver "0.1." == Err (InvalidPatchVersion Empty)
-
-expect
-    semver "0.1.0"
-    == Ok {
-        major: 0,
-        minor: 1,
-        patch: 0,
-        build: [],
-        preRelease: [],
-    }
-
-expect semver "0.1.0." == Err (UnexpectedSuffix ".")
-expect semver "0.1.00" == Err (InvalidPatchVersion CannotStartWithZero)
+expect semver("") == Err(EmptySemver)
+expect semver("0") == Err(NoPeriodAfterMajorVersion)
+expect semver("0.") == Err(InvalidMinorVersion(Empty))
+expect semver("0.1") == Err(NoPeriodAfterMinorVersion)
+expect semver("0.1.") == Err(InvalidPatchVersion(Empty))
 
 expect
-    semver "0.1230.0-alpha.beta"
-    == Ok {
-        major: 0,
-        minor: 1230,
-        patch: 0,
-        build: [],
-        preRelease: ["alpha", "beta"],
-    }
+    semver("0.1.0")
+    == Ok(
+        {
+            major: 0,
+            minor: 1,
+            patch: 0,
+            build: [],
+            pre_release: [],
+        },
+    )
+
+expect semver("0.1.0.") == Err(UnexpectedSuffix("."))
+expect semver("0.1.00") == Err(InvalidPatchVersion(CannotStartWithZero))
 
 expect
-    semver "0.1230.0+alpha.beta"
-    == Ok {
-        major: 0,
-        minor: 1230,
-        patch: 0,
-        build: ["alpha", "beta"],
-        preRelease: [],
-    }
+    semver("0.1230.0-alpha.beta")
+    == Ok(
+        {
+            major: 0,
+            minor: 1230,
+            patch: 0,
+            build: [],
+            pre_release: ["alpha", "beta"],
+        },
+    )
 
 expect
-    semver "0.1230.0-alpha-beta+gamma.delta"
-    == Ok {
-        major: 0,
-        minor: 1230,
-        patch: 0,
-        build: ["gamma", "delta"],
-        preRelease: ["alpha-beta"],
-    }
+    semver("0.1230.0+alpha.beta")
+    == Ok(
+        {
+            major: 0,
+            minor: 1230,
+            patch: 0,
+            build: ["alpha", "beta"],
+            pre_release: [],
+        },
+    )
+
+expect
+    semver("0.1230.0-alpha-beta+gamma.delta")
+    == Ok(
+        {
+            major: 0,
+            minor: 1230,
+            patch: 0,
+            build: ["gamma", "delta"],
+            pre_release: ["alpha-beta"],
+        },
+    )
 
 expect
     ## If pre-release segment is after build segment, it's parsed as a build segment
-    semver "0.1230.0+alpha-beta"
-    == Ok {
-        major: 0,
-        minor: 1230,
-        patch: 0,
-        build: ["alpha-beta"],
-        preRelease: [],
-    }
+    semver("0.1230.0+alpha-beta")
+    == Ok(
+        {
+            major: 0,
+            minor: 1230,
+            patch: 0,
+            build: ["alpha-beta"],
+            pre_release: [],
+        },
+    )
 
-expect semver "0.1.0-" == Err (InvalidPreRelease EmptySegment)
-expect semver "0.1.0-?" == Err (InvalidPreRelease InvalidIdentifier)
-expect semver "0.1.0+" == Err (InvalidBuild EmptySegment)
-expect semver "0.1.0+?" == Err (InvalidBuild InvalidIdentifier)
-
-expect
-    versionReq ">=1.2.3, <1.8.0-alpha.beta"
-    == Ok [
-        Relation { operator: GreaterThanOrEqualTo, version: Full { major: 1, minor: 2, patch: 3, preRelease: [] } },
-        Relation { operator: LessThan, version: Full { major: 1, minor: 8, patch: 0, preRelease: ["alpha", "beta"] } },
-    ]
-
-expect versionReq "" == Err (InvalidComparator { index: 0, error: InvalidMajorVersion Empty })
-expect versionReq "*" == Ok []
+expect semver("0.1.0-") == Err(InvalidPreRelease(EmptySegment))
+expect semver("0.1.0-?") == Err(InvalidPreRelease(InvalidIdentifier))
+expect semver("0.1.0+") == Err(InvalidBuild(EmptySegment))
+expect semver("0.1.0+?") == Err(InvalidBuild(InvalidIdentifier))
 
 expect
-    versionReq "123"
-    == Ok [
-        Relation { operator: Exact, version: Major 123 },
-    ]
+    version_req(">=1.2.3, <1.8.0-alpha.beta")
+    == Ok(
+        [
+            Relation({ operator: GreaterThanOrEqualTo, version: Full({ major: 1, minor: 2, patch: 3, pre_release: [] }) }),
+            Relation({ operator: LessThan, version: Full({ major: 1, minor: 8, patch: 0, pre_release: ["alpha", "beta"] }) }),
+        ],
+    )
+
+expect version_req("") == Err(InvalidComparator({ index: 0, error: InvalidMajorVersion(Empty) }))
+expect version_req("*") == Ok([])
 
 expect
-    versionReq "123.456"
-    == Ok [
-        Relation { operator: Exact, version: MajorMinor 123 456 },
-    ]
+    version_req("123")
+    == Ok(
+        [
+            Relation({ operator: Exact, version: Major(123) }),
+        ],
+    )
 
 expect
-    versionReq "123.456.789"
-    == Ok [
-        Relation { operator: Exact, version: Full { major: 123, minor: 456, patch: 789, preRelease: [] } },
-    ]
+    version_req("123.456")
+    == Ok(
+        [
+            Relation({ operator: Exact, version: MajorMinor(123, 456) }),
+        ],
+    )
 
 expect
-    versionReq "123.456.789-alpha"
-    == Ok [
-        Relation { operator: Exact, version: Full { major: 123, minor: 456, patch: 789, preRelease: ["alpha"] } },
-    ]
+    version_req("123.456.789")
+    == Ok(
+        [
+            Relation({ operator: Exact, version: Full({ major: 123, minor: 456, patch: 789, pre_release: [] }) }),
+        ],
+    )
 
 expect
-    versionReq "123.456.789-alpha+beta"
-    == Ok [
-        Relation { operator: Exact, version: Full { major: 123, minor: 456, patch: 789, preRelease: ["alpha"] } },
-    ]
+    version_req("123.456.789-alpha")
+    == Ok(
+        [
+            Relation({ operator: Exact, version: Full({ major: 123, minor: 456, patch: 789, pre_release: ["alpha"] }) }),
+        ],
+    )
 
 expect
-    versionReq "123.456.789-alpha+"
-    == Err (InvalidComparator { index: 0, error: InvalidBuildConstraint EmptySegment })
+    version_req("123.456.789-alpha+beta")
+    == Ok(
+        [
+            Relation({ operator: Exact, version: Full({ major: 123, minor: 456, patch: 789, pre_release: ["alpha"] }) }),
+        ],
+    )
 
 expect
-    versionReq "123.456.789-alpha+?"
-    == Err (InvalidComparator { index: 0, error: InvalidBuildConstraint InvalidIdentifier })
+    version_req("123.456.789-alpha+")
+    == Err(InvalidComparator({ index: 0, error: InvalidBuildConstraint(EmptySegment) }))
 
 expect
-    versionReq "1.x"
-    == Ok [
-        Wildcard (Major 1),
-    ]
+    version_req("123.456.789-alpha+?")
+    == Err(InvalidComparator({ index: 0, error: InvalidBuildConstraint(InvalidIdentifier) }))
 
 expect
-    versionReq "2.x.x"
-    == Err (UnexpectedSuffix ".x")
+    version_req("1.x")
+    == Ok(
+        [
+            Wildcard(Major(1)),
+        ],
+    )
 
 expect
-    versionReq "2.x.3"
-    == Err (UnexpectedSuffix ".3")
+    version_req("2.x.x")
+    == Err(UnexpectedSuffix(".x"))
 
 expect
-    versionReqLazy "4.x ?"
-    == Ok ([Wildcard (Major 4)], " ?")
+    version_req("2.x.3")
+    == Err(UnexpectedSuffix(".3"))
 
-expect versionReq "4.x ?" == Err (UnexpectedSuffix " ?")
+expect
+    version_req_lazy("4.x ?")
+    == Ok(([Wildcard(Major(4))], " ?"))
+
+expect version_req("4.x ?") == Err(UnexpectedSuffix(" ?"))
 
 expect
     "123"
-    |> List.repeat maxComparatorCount
-    |> Str.joinWith ","
-    |> versionReq
-    |> Result.map List.len
-    == Ok 32
+    |> List.repeat(max_comparator_count)
+    |> Str.join_with(",")
+    |> version_req
+    |> Result.map_ok(List.len)
+    == Ok(32)
 
 expect
     "123"
-    |> List.repeat (maxComparatorCount + 1)
-    |> Str.joinWith ","
-    |> versionReq
-    == Err TooManyComparators
+    |> List.repeat((max_comparator_count + 1))
+    |> Str.join_with(",")
+    |> version_req
+    == Err(TooManyComparators)
 
 expect
-    x = Parse.versionReq ">=1.2.2-alpha.beta, <2"
+    x = Parse.version_req(">=1.2.2-alpha.beta, <2")
     x
-    == Ok [
-        Relation { operator: GreaterThanOrEqualTo, version: Full { major: 1, minor: 2, patch: 2, preRelease: ["alpha", "beta"] } },
-        Relation { operator: LessThan, version: Major 2 },
-    ]
+    == Ok(
+        [
+            Relation({ operator: GreaterThanOrEqualTo, version: Full({ major: 1, minor: 2, patch: 2, pre_release: ["alpha", "beta"] }) }),
+            Relation({ operator: LessThan, version: Major(2) }),
+        ],
+    )
 
 expect
-    parsedOperators =
+    parsed_operators =
         ["=", ">", ">=", "<", "<=", "~", "^", ""]
-        |> List.mapTry \op ->
-            when parseComparatorOperator (Str.toUtf8 op) is
-                (oper, []) -> Ok oper
-                _other -> Err FailedToParse
+        |> List.map_try(
+            |op|
+                when parse_comparator_operator(Str.to_utf8(op)) is
+                    (oper, []) -> Ok(oper)
+                    _other -> Err(FailedToParse),
+        )
 
-    parsedOperators
-    == Ok [
-        Exact,
-        GreaterThan,
-        GreaterThanOrEqualTo,
-        LessThan,
-        LessThanOrEqualTo,
-        PatchUpdates,
-        Compatible,
-        Exact,
-    ]
+    parsed_operators
+    == Ok(
+        [
+            Exact,
+            GreaterThan,
+            GreaterThanOrEqualTo,
+            LessThan,
+            LessThanOrEqualTo,
+            PatchUpdates,
+            Compatible,
+            Exact,
+        ],
+    )
 
 expect
-    Str.toUtf8 "."
-    |> parseComparatorOperator
+    Str.to_utf8(".")
+    |> parse_comparator_operator
     == (Exact, [AsciiCode.period])

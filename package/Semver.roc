@@ -1,7 +1,7 @@
 module [
     parse,
-    parseLazy,
-    toStr,
+    parse_lazy,
+    to_str,
     compare,
 ]
 
@@ -13,25 +13,25 @@ import Error exposing [InvalidSemverError]
 ## Render a semver to a string.
 ##
 ## ```roc
-## versionStr = "1.2.3-alpha+beta"
-## version = parse versionStr
+## version_str = "1.2.3-alpha+beta"
+## version = parse(version_str)?
 ##
-## expect toStr version == versionStr
+## expect to_str(version) == version_str
 ## ```
-toStr : Semver -> Str
-toStr = \{ major, minor, patch, build, preRelease } ->
-    preReleaseStr =
-        if List.isEmpty preRelease then
+to_str : Semver -> Str
+to_str = |{ major, minor, patch, build, pre_release }|
+    pre_release_str =
+        if List.is_empty(pre_release) then
             ""
         else
-            "-$(preRelease |> Str.joinWith ".")"
-    buildStr =
-        if List.isEmpty build then
+            "-${pre_release |> Str.join_with(".")}"
+    build_str =
+        if List.is_empty(build) then
             ""
         else
-            "+$(build |> Str.joinWith ".")"
+            "+${build |> Str.join_with(".")}"
 
-    "$(Num.toStr major).$(Num.toStr minor).$(Num.toStr patch)$(preReleaseStr)$(buildStr)"
+    "${Num.to_str(major)}.${Num.to_str(minor)}.${Num.to_str(patch)}${pre_release_str}${build_str}"
 
 ## Parse a semver from a string.
 ##
@@ -39,9 +39,9 @@ toStr = \{ major, minor, patch, build, preRelease } ->
 ## twin function if you want to get the leftover text after parsing.
 ##
 ## ```roc
-## version = parse "1.2.3-alpha+beta"
+## version = parse("1.2.3-alpha+beta")
 ##
-## expect version == Ok { major: 1, minor: 2, patch: 3, preRelease: ["alpha"], build: ["beta"] }
+## expect version == Ok({ major: 1, minor: 2, patch: 3, pre_release: ["alpha"], build: ["beta"] })
 ## ```
 parse : Str -> Result Semver InvalidSemverError
 parse = Parse.semver
@@ -51,31 +51,31 @@ parse = Parse.semver
 ## If you don't need the leftover text, use the [parse] twin function.
 ##
 ## ```roc
-## version = parse "1.2.3 abc"
+## version = parse_lazy("1.2.3 abc")
 ##
-## expect version == Ok {
-##     version: { major: 1, minor: 2, patch: 3, preRelease: [], build: [] },
-##     rest: " abc",
-## }
+## expect version == Ok (
+##     { major: 1, minor: 2, patch: 3, pre_release: [], build: [] },
+##     " abc",
+## )
 ## ```
-parseLazy : Str -> Result (Semver, Str) InvalidSemverError
-parseLazy = Parse.semverLazy
+parse_lazy : Str -> Result (Semver, Str) InvalidSemverError
+parse_lazy = Parse.semver_lazy
 
 ## Compare two semvers, useful for sorting.
 ##
 ## ```roc
-## version1 = { major: 1, minor: 2, patch: 3, preRelease: [], build: [] }
-## version2 = { major: 1, minor: 3, patch: 0, preRelease: [], build: [] }
+## version1 = { major: 1, minor: 2, patch: 3, pre_release: [], build: [] }
+## version2 = { major: 1, minor: 3, patch: 0, pre_release: [], build: [] }
 ##
-## expect compare version1 version2 == LT
+## expect compare(version1, version2) == LT
 ## ```
 compare : Semver, Semver -> Ordering
-compare = Compare.compareSemvers
+compare = Compare.compare_semvers
 
 expect
-    toStr { major: 1, minor: 2, patch: 3, build: [], preRelease: [] }
+    to_str({ major: 1, minor: 2, patch: 3, build: [], pre_release: [] })
     == "1.2.3"
 
 expect
-    toStr { major: 1, minor: 2, patch: 3, build: ["def-", "ghi"], preRelease: ["abc"] }
+    to_str({ major: 1, minor: 2, patch: 3, build: ["def-", "ghi"], pre_release: ["abc"] })
     == "1.2.3-abc+def-.ghi"

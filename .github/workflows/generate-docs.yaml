@@ -17,9 +17,10 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v3
       - name: Install Roc
-        uses: hasnep/setup-roc@main
+        uses: hasnep/setup-roc@v0.5.0
         with:
           roc-version: nightly
+          testing: "auto"
       - name: Generate docs
         run: roc docs package/main.roc
       - name: Fix absolute paths
